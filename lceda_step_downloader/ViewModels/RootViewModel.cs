@@ -52,13 +52,13 @@ namespace lceda_step_downloader.ViewModels
         }
 
         private Model3DGroup _myModelGroup;
-        public Model3DGroup MyModelGroup 
-        { 
-            get { return _myModelGroup; } 
-            set 
-            { 
+        public Model3DGroup MyModelGroup
+        {
+            get { return _myModelGroup; }
+            set
+            {
                 SetAndNotify(ref _myModelGroup, value);
-                
+
             }
         }
 
@@ -78,7 +78,7 @@ namespace lceda_step_downloader.ViewModels
         }
 
         private Component _selectedcomponent;
-        public Component SelectedComponent 
+        public Component SelectedComponent
         {
             get { return _selectedcomponent; }
             set { SetAndNotify(ref _selectedcomponent, value); }
@@ -95,7 +95,7 @@ namespace lceda_step_downloader.ViewModels
         public SearchSite SSite
         {
             get { return _ssite; }
-            set 
+            set
             {
                 _ssite = value;
                 Debug.WriteLine(value.Site);
@@ -132,7 +132,7 @@ namespace lceda_step_downloader.ViewModels
 
         public async void SearchTask(string argument)
         {
-            if(SSite == null)
+            if (SSite == null)
             {
                 return;
             }
@@ -144,7 +144,7 @@ namespace lceda_step_downloader.ViewModels
                 SearchResult = await JsonSerializer.DeserializeAsync<Root>(await streamTask);
                 Debug.WriteLine(SearchResult.result.Count);
             }
-            
+
         }
 
         public void OnResultSelection()
@@ -161,20 +161,20 @@ namespace lceda_step_downloader.ViewModels
                 ImageSource = "https:" + Selecteditem.creator.avatar;
                 return;
             }
-            ImageSource = Selecteditem.images[0];          
+            ImageSource = Selecteditem.images[0];
         }
 
         public void DownloadObj()
         {
-            if(Selecteditem == null)
+            if (Selecteditem == null)
             {
                 return;
             }
-            
+
             Debug.WriteLine("准备下载obj:编号{0},标题{1}", SearchResult.result.IndexOf(Selecteditem), Selecteditem.display_title);
             Debug.WriteLine(Selecteditem.attributes._3D_Model);
 
-            if (File.Exists(@".\temp\" + Selecteditem.title.ToString().Replace("/","") + @".obj"))
+            if (File.Exists(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj"))
             {
                 Debug.WriteLine("存在缓存");
                 Application.Current.Dispatcher.Invoke(() =>
@@ -184,12 +184,16 @@ namespace lceda_step_downloader.ViewModels
 
                 });
                 return;
-            }           
+            }
             Task.Run(() => DownloadObjAsync());
         }
 
-        public void DownloadStep() 
+        public void DownloadStep()
         {
+            //https://pro.lceda.cn/api/components/9059586b8e0c4e2ba21b2ac2c1eb066b?uuid=9059586b8e0c4e2ba21b2ac2c1eb066b&path=0819f05c4eef4c71ace90d822a990e87
+            //https://pro.lceda.cn/api/components/105b388c0c03439aa7dbf35dd2b762a6?uuid=105b388c0c03439aa7dbf35dd2b762a6
+            //{"success":true,"code":0,"result":{"uuid":"105b388c0c03439aa7dbf35dd2b762a6","modifier":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"creator":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"owner":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"description":"","docType":16,"dataStr":"{\"model\":\"6d30b5a04660477fbdff168686b01590\",\"type\":\"wrl\",\"src\":\"qfn-56_l7.0-w7.0-p0.40-tl-ep4.0\",\"unit\":\"mm\"}","tags":{"parent_tag":[],"child_tag":[]},"public":true,"source":"","version":1653017104,"type":3,"title":"qfn-56_l7.0-w7.0-p0.40-tl-ep4.0","createTime":1653017104,"updateTime":1658962217,"created_at":"2022-05-20 11:25:04","display_title":"QFN-56_L7.0-W7.0-P0.40-TL-EP4.0","updated_at":"2022-07-28 06:55:05","ticket":1,"std_uuid":"ce2b808f96c74d7981784d534cecd1c0","3d_model_uuid":"6d30b5a04660477fbdff168686b01590","has_device":false,"path":"0819f05c4eef4c71ace90d822a990e87"}}
+            //https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/6d30b5a04660477fbdff168686b01590
             if (Selecteditem == null)
             {
                 return;
@@ -224,6 +228,16 @@ namespace lceda_step_downloader.ViewModels
             }
             Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
 
+            Stream streamStep = await client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.result._3d_model_uuid);
+            string fileToWriteTo = @".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step";
+            using Stream streamToWriteTo = File.Open(fileToWriteTo, FileMode.Create);
+            await streamStep.CopyToAsync(streamToWriteTo);
+            //MediaEle sr = new(await streamStep);
+            //using Stream streamToWriteTo = File.Open(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step", FileMode.Create);
+            //await sr.CopyToAsync(streamToWriteTo);
+
+            //StreamWriter stepWriter = new(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step");
+
             //器件模型的变换数据, 以适应lceda的坐标系以及比例, 参数由lc后台维护, 可见lceda的模型也不全是自己画的
             var model_dx = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[0]) / 10.0;
             var model_dy = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[1]) / 10.0;
@@ -236,55 +250,55 @@ namespace lceda_step_downloader.ViewModels
             var model_z = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[8]) / 10.0 - 49;
 
             //构造的PCB数据
-            var stringPayload =
-                "[\"DOCTYPE\",\"PREVIEW\",\"1.0\"]\r\n" +
-                "[\"HEAD\",{\"scale\":0.0254}]\r\n" +
-                "[\"HEAD\",{\"scale\":10}]\r\n" +
-                "[\"LAYER\",11,\"OUTLINE\",\"Board Outline Layer\",3,\"#c2c200\",1,\"#c2c200\",1]\r\n" +
-                "[\"POLY\",\"e60\",0,\"\",11,1,[40,-40,\"L\",42,-40,42,-38,40,-38,40,-40],0]\r\n" +
-                "[\"COMPONENT\",\"e0\",0,9,0,0,0,{\"uuid\":\"" + SelectedComponent.result._3d_model_uuid +
-                "\",\"dx\":" + model_dx.ToString() +
-                ",\"dy\":" + model_dy.ToString() +
-                ",\"dz\":" + model_dz.ToString() +
-                ",\"rz\":" + model_rz.ToString() +
-                ",\"rx\":" + model_rx.ToString() +
-                ",\"ry\":" + model_ry.ToString() +
-                ",\"x\":" + model_x.ToString() +
-                ",\"y\":" + model_y.ToString() +
-                ",\"z\":" + model_z.ToString() +
-                ",\"Footprint\":\"USB-C-SMD_TYPEC-303-ACP16\",\"Designator\":\"USB1\",\"Device\":\"TYPEC-303-ACP16\"},0]";
+            //var stringPayload =
+            //    "[\"DOCTYPE\",\"PREVIEW\",\"1.0\"]\r\n" +
+            //    "[\"HEAD\",{\"scale\":0.0254}]\r\n" +
+            //    "[\"HEAD\",{\"scale\":10}]\r\n" +
+            //    "[\"LAYER\",11,\"OUTLINE\",\"Board Outline Layer\",3,\"#c2c200\",1,\"#c2c200\",1]\r\n" +
+            //    "[\"POLY\",\"e60\",0,\"\",11,1,[40,-40,\"L\",42,-40,42,-38,40,-38,40,-40],0]\r\n" +
+            //    "[\"COMPONENT\",\"e0\",0,9,0,0,0,{\"uuid\":\"" + SelectedComponent.result._3d_model_uuid +
+            //    "\",\"dx\":" + model_dx.ToString() +
+            //    ",\"dy\":" + model_dy.ToString() +
+            //    ",\"dz\":" + model_dz.ToString() +
+            //    ",\"rz\":" + model_rz.ToString() +
+            //    ",\"rx\":" + model_rx.ToString() +
+            //    ",\"ry\":" + model_ry.ToString() +
+            //    ",\"x\":" + model_x.ToString() +
+            //    ",\"y\":" + model_y.ToString() +
+            //    ",\"z\":" + model_z.ToString() +
+            //    ",\"Footprint\":\"USB-C-SMD_TYPEC-303-ACP16\",\"Designator\":\"USB1\",\"Device\":\"TYPEC-303-ACP16\"},0]";
 
-            var compressedContent = CompressRequestContent(stringPayload);
-            compressedContent.Headers.Add("Content-Encoding", "gzip");
-            compressedContent.Headers.Add("Content-Type", "x-application/x-gzip");
+            //var compressedContent = CompressRequestContent(stringPayload);
+            //compressedContent.Headers.Add("Content-Encoding", "gzip");
+            //compressedContent.Headers.Add("Content-Type", "x-application/x-gzip");
 
-            var resp = await client.PostAsync("https://pro.lceda.cn/occapi/api/convert/pcb2step", compressedContent);
+            //var resp = await client.PostAsync("https://pro.lceda.cn/occapi/api/convert/pcb2step", compressedContent);
 
-            var responseStream = await resp.Content.ReadAsStreamAsync();
+            //var responseStream = await resp.Content.ReadAsStreamAsync();
 
-            var streamReader = new StreamReader(responseStream);
+            //var streamReader = new StreamReader(responseStream);
 
-            StreamWriter stepWriter = new(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step");
-            
+            //StreamWriter stepWriter = new(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step");
+
             //如果你上传的PCB数据里只有器件没有PCB, 或者PCB面积过小(<0.5*0.5mm), lc后台都会给你加上PCB
             //所以这里用了个凑活能用的方法:在程序里自动删掉PCB对应实体节点, 可能在某些软件里仍然会显示一个小小的PCB
             //实测AD Fusion 360 SW显示正常, 有更好的方法欢迎PR
-            string readline;
-            while ((readline = streamReader.ReadLine()) != null)
-            {
-                if(readline.Contains("#29 = ADVANCED_BREP_SHAPE_REPRESENTATION('',(#11,#30)"))
-                {
-                    stepWriter.WriteLine(readline.Replace("#30", "'NONE'"));
-                }
-                else
-                {
-                    stepWriter.WriteLine(readline);
-                }
-            }
+            //string readline;
+            //while ((readline = streamReader.ReadLine()) != null)
+            //{
+            //    if(readline.Contains("#29 = ADVANCED_BREP_SHAPE_REPRESENTATION('',(#11,#30)"))
+            //    {
+            //        stepWriter.WriteLine(readline.Replace("#30", "'NONE'"));
+            //    }
+            //    else
+            //    {
+            //        stepWriter.WriteLine(readline);
+            //    }
+            //}
 
-            stepWriter.Flush();
-            stepWriter.Close();
-            stepWriter.Dispose();
+            //stepWriter.Flush();
+            //stepWriter.Close();
+            //stepWriter.Dispose();
             DownloadAllowed = true;
             Growl.Success("下载成功");
         }
@@ -325,7 +339,7 @@ namespace lceda_step_downloader.ViewModels
 
         //lc前端从服务端获取的OBJ模型数据实际上是把mtl和obj写在了一个文件里面, 然后前端再做处理展示, 这里同样需要做分离
         public async void ObjMtlSplit(Task<Stream> objstream)
-        {          
+        {
             StreamWriter objWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
             StreamWriter mtlWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".mtl");
 
@@ -351,12 +365,12 @@ namespace lceda_step_downloader.ViewModels
             mtlWriter.Flush();
             mtlWriter.Close();
             objWriter.Flush();
-            objWriter.Close();            
+            objWriter.Close();
             Application.Current.Dispatcher.Invoke(() =>
             {
                 ObjReader CurrentHelixObjReader = new();
                 MyModelGroup = CurrentHelixObjReader.Read(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
-            } );
+            });
         }
     }
 

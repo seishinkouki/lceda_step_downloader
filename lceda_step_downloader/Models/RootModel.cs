@@ -12,12 +12,6 @@ namespace lceda_step_downloader.Models.Root
         public string Site { get; set; }
         public int Value { get; set; }
     }
-    internal class RootViewModel
-    {
-
-    }
-
-
     public class Owner
     {
         public string uuid { get; set; }
