@@ -161,7 +161,7 @@ namespace lceda_step_downloader.Models.Root
 
         public string title { get; set; }
 
-        public Tags tags { get; set; }
+        //public Tags tags { get; set; }
 
         public List<string> images { get; set; }
 

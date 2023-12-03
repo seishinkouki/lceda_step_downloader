@@ -140,7 +140,6 @@ namespace lceda_step_downloader.ViewModels
             {
                 var streamTask = client.GetStreamAsync("https://pro.lceda.cn/api/szlcsc/eda/product/list?wd=" + argument.ToString());
                 Debug.WriteLine(streamTask.ToString());
-
                 SearchResult = await JsonSerializer.DeserializeAsync<Root>(await streamTask);
                 Debug.WriteLine(SearchResult.result.Count);
             }
