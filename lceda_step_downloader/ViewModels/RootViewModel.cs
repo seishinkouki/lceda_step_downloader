@@ -228,7 +228,8 @@ namespace lceda_step_downloader.ViewModels
             Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
 
             Stream streamStep = await client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.result._3d_model_uuid);
-            string fileToWriteTo = @".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step";
+            var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
+            string fileToWriteTo = Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".step");
             using Stream streamToWriteTo = File.Open(fileToWriteTo, FileMode.Create);
             await streamStep.CopyToAsync(streamToWriteTo);
             //MediaEle sr = new(await streamStep);
@@ -339,10 +340,13 @@ namespace lceda_step_downloader.ViewModels
         //lc前端从服务端获取的OBJ模型数据实际上是把mtl和obj写在了一个文件里面, 然后前端再做处理展示, 这里同样需要做分离
         public async void ObjMtlSplit(Task<Stream> objstream)
         {
-            StreamWriter objWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
-            StreamWriter mtlWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".mtl");
+            var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
+            StreamWriter objWriter = new(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj"));
+            StreamWriter mtlWriter = new(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".mtl"));
+            //StreamWriter objWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
+            //StreamWriter mtlWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".mtl");
 
-            objWriter.WriteLine("mtllib " + Selecteditem.title.ToString().Replace("/", "") + ".mtl");
+            objWriter.WriteLine("mtllib " + tempTitle + ".mtl");
             StreamReader sr = new(await objstream);
             String readline = string.Empty;
             while ((readline = sr.ReadLine()) != null)
@@ -368,7 +372,7 @@ namespace lceda_step_downloader.ViewModels
             Application.Current.Dispatcher.Invoke(() =>
             {
                 ObjReader CurrentHelixObjReader = new();
-                MyModelGroup = CurrentHelixObjReader.Read(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
+                MyModelGroup = CurrentHelixObjReader.Read(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj"));
             });
         }
     }
