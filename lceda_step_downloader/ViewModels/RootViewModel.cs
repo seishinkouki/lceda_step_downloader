@@ -201,7 +201,10 @@ namespace lceda_step_downloader.ViewModels
             Debug.WriteLine("准备下载step:编号{0},标题{1}", SearchResult.result.IndexOf(Selecteditem), Selecteditem.display_title);
             Debug.WriteLine(Selecteditem.attributes._3D_Model_Transform);
 
-            if (File.Exists(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step"))
+            //器件名称
+            //if (File.Exists(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step"))
+            //封装名称
+            if (File.Exists(@".\step\" + Selecteditem.footprint.display_title.ToString().Replace("/", "") + @".step"))
             {
                 Debug.WriteLine("存在step缓存");
                 Growl.Info("STEP文件已存在");
@@ -228,8 +231,11 @@ namespace lceda_step_downloader.ViewModels
             Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
 
             Stream streamStep = await client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.result._3d_model_uuid);
-            var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
-            string fileToWriteTo = Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".step");
+            //器件名称
+            //var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
+            //封装名称
+            var tempTitle = string.Join("_", Selecteditem.footprint.display_title.ToString().ToString().Split(Path.GetInvalidFileNameChars()));
+            string fileToWriteTo = Path.Combine(AppContext.BaseDirectory, "step", tempTitle + ".step");
             using Stream streamToWriteTo = File.Open(fileToWriteTo, FileMode.Create);
             await streamStep.CopyToAsync(streamToWriteTo);
             //MediaEle sr = new(await streamStep);
