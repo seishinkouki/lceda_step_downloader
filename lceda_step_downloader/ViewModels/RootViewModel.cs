@@ -102,6 +102,20 @@ namespace lceda_step_downloader.ViewModels
             }
         }
 
+        private bool _automaticLoadObj;
+        public bool AutomaticLoadObj
+        {
+            get { return _automaticLoadObj; }
+            set 
+            { 
+                SetAndNotify(ref _automaticLoadObj, value);
+                if (value && Selecteditem != null)
+                {
+                    DownloadObj();
+                }
+            }
+        }
+
         public RootViewModel()
         {
             Selecteditem = null;
@@ -111,6 +125,7 @@ namespace lceda_step_downloader.ViewModels
               new SearchSite(){Site="LCSC", Value = 1},
             };
             SSite = SearchSites[0];
+            AutomaticLoadObj = false;
 
             //创建模型存储目录
             if (!Directory.Exists(@".\temp"))
@@ -161,6 +176,10 @@ namespace lceda_step_downloader.ViewModels
                 return;
             }
             ImageSource = Selecteditem.images[0];
+            if (AutomaticLoadObj)
+            {
+                DownloadObj();
+            }
         }
 
         public void DownloadObj()
@@ -169,6 +188,10 @@ namespace lceda_step_downloader.ViewModels
             {
                 return;
             }
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                MyModelGroup = null;
+            });
 
             Debug.WriteLine("准备下载obj:编号{0},标题{1}", SearchResult.result.IndexOf(Selecteditem), Selecteditem.display_title);
             Debug.WriteLine(Selecteditem.attributes._3D_Model);
