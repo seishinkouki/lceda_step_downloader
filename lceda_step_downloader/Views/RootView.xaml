@@ -5,18 +5,20 @@
            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
            xmlns:hc="https://handyorg.github.io/handycontrol"
            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-           xmlns:s="https://github.com/canton7/Stylet"
-           xmlns:viewModels="clr-namespace:lceda_step_downloader.ViewModels"
+           xmlns:vm="clr-namespace:lceda_step_downloader.ViewModels"
            Title="{Binding Title}"
            Width="760"
            Height="600"
-           d:DataContext="{d:DesignInstance Type=viewModels:RootViewModel}"
            ShowTitle="True"
            WindowStartupLocation="CenterScreen"
            mc:Ignorable="d">
+    <hc:Window.DataContext>
+        <vm:RootViewModel />
+    </hc:Window.DataContext>
     <Window.Resources>
-        <viewModels:IndexConverter x:Key="MyIndexConverter" />
-        <viewModels:BooleanOrConverter x:Key="MyallowdownloadConverter" />
+        <vm:IndexConverter x:Key="MyIndexConverter" />
+        <vm:BooleanOrConverter x:Key="MyallowdownloadConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
     <Grid Width="{Binding RelativeSource={RelativeSource AncestorType={x:Type Window}}, Path=ActualWidth}" Height="{Binding RelativeSource={RelativeSource AncestorType={x:Type Window}}, Path=ActualHeight}">
         <Grid Grid.Column="0" Margin="0,5,0,28">
@@ -39,22 +41,20 @@
                                  HorizontalAlignment="Stretch"
                                  DisplayMemberPath="Site"
                                  ItemsSource="{Binding SearchSites}"
-                                 SelectedItem="{Binding SSite}"
-                                 Style="{StaticResource ComboBoxExtend}" />
+                                 SelectedItem="{Binding SSite}" />
                     <hc:SearchBar Grid.Column="1"
                                   Margin="5,0,5,0"
                                   HorizontalAlignment="Stretch"
-                                  Command="{s:Action DoSearch}"
+                                  Command="{Binding DoSearchCommand}"
                                   CommandParameter="{Binding Text, RelativeSource={RelativeSource Self}}"
                                   IsRealTime="False" />
                 </Grid>
                 <Grid Grid.Row="1" Margin="0,0,0,5">
                     <ListView Grid.Row="0"
-                              Margin="0,5,5,0"
+                              Margin="5,5,5,0"
                               HorizontalAlignment="Stretch"
                               ItemsSource="{Binding SearchResult.result}"
-                              SelectedItem="{Binding Selecteditem}"
-                              SelectionChanged="{s:Action OnResultSelection}">
+                              SelectedItem="{Binding SelectedItem}">
                         <ListView.Resources>
                             <Style TargetType="GridViewColumnHeader">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -81,28 +81,50 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="40" />
                 </Grid.RowDefinitions>
-                <Image Grid.Row="0" Source="{Binding Path=ImageSource}" />
-                <HelixToolkit:HelixViewport3D Grid.Row="1"
-                                              IsHeadLightEnabled="False"
-                                              ZoomExtentsWhenLoaded="True">
-                    <HelixToolkit:DefaultLights />
-                    <ModelVisual3D Content="{Binding MyModelGroup}" />
-                    <HelixToolkit:GridLinesVisual3D Width="8"
-                                                    Length="8"
-                                                    MajorDistance="1"
-                                                    MinorDistance="1"
-                                                    Thickness="0.01" />
-                </HelixToolkit:HelixViewport3D>
+                <Grid Grid.Row="0">
+                    <Image Source="{Binding Path=ImageSource}" Stretch="Uniform" />
+                    <Border Background="#66FFFFFF"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding IsImageLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <hc:LoadingCircle Width="40"
+                                          Height="40"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          DotDiameter="6"
+                                          DotInterval="12" />
+                    </Border>
+                </Grid>
+                <Grid Grid.Row="1">
+                    <HelixToolkit:HelixViewport3D IsHeadLightEnabled="False" ZoomExtentsWhenLoaded="True">
+                        <HelixToolkit:DefaultLights />
+                        <ModelVisual3D Content="{Binding MyModelGroup}" />
+                        <HelixToolkit:GridLinesVisual3D Width="8"
+                                                        Length="8"
+                                                        MajorDistance="1"
+                                                        MinorDistance="1"
+                                                        Thickness="0.01" />
+                    </HelixToolkit:HelixViewport3D>
+                    <Border Background="#66FFFFFF"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding IsObjLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <hc:LoadingCircle Width="40"
+                                          Height="40"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          DotDiameter="6"
+                                          DotInterval="12"
+                                          Style="{StaticResource LoadingBaseStyle}" />
+                    </Border>
+                </Grid>
                 <Grid Grid.Row="2" Margin="0,3,0,10">
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="showobj"
-                                Grid.Column="0"
                                 Height="30"
                                 Margin="5,0,5,0"
                                 Padding="5,0,5,0"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Center"
-                                Command="{s:Action DownloadObj}"
+                                Command="{Binding DownloadObjCommand}"
                                 FontSize="16">
                             <Button.Style>
                                 <Style BasedOn="{StaticResource ButtonDefault}" TargetType="Button">
@@ -120,7 +142,7 @@
                                         </Setter.Value>
                                     </Setter>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Selecteditem.attributes._3D_Model}" Value="{x:Null}">
+                                        <DataTrigger Binding="{Binding SelectedItem.attributes._3D_Model}" Value="{x:Null}">
                                             <Setter Property="IsEnabled" Value="False" />
                                             <Setter Property="Content" Value="暂无3D模型" />
                                         </DataTrigger>
@@ -132,11 +154,12 @@
                         <Button Name="downloadstep"
                                 Grid.Column="1"
                                 Height="30"
+                                MinWidth="100"
                                 Margin="0,0,10,0"
                                 Padding="5,0,5,0"
-                                HorizontalAlignment="Stretch"
+                                HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Command="{s:Action DownloadStep}">
+                                Command="{Binding DownloadStepCommand}">
                             <Button.IsEnabled>
                                 <MultiBinding Converter="{StaticResource MyallowdownloadConverter}">
                                     <Binding ElementName="showobj" Path="IsEnabled" />
@@ -154,7 +177,6 @@
                                                     </MultiDataTrigger.Conditions>
                                                     <MultiDataTrigger.Setters>
                                                         <Setter Property="Text" Value="暂无3D模型" />
-                                                        <Setter Property="Margin" Value="20,0,0,0" />
                                                     </MultiDataTrigger.Setters>
                                                 </MultiDataTrigger>
                                                 <MultiDataTrigger>
@@ -164,7 +186,6 @@
                                                     </MultiDataTrigger.Conditions>
                                                     <MultiDataTrigger.Setters>
                                                         <Setter Property="Text" Value="下载中" />
-                                                        <Setter Property="Margin" Value="20,0,0,0" />
                                                     </MultiDataTrigger.Setters>
                                                 </MultiDataTrigger>
                                                 <MultiDataTrigger>
@@ -174,52 +195,13 @@
                                                     </MultiDataTrigger.Conditions>
                                                     <MultiDataTrigger.Setters>
                                                         <Setter Property="Text" Value="下载STEP" />
-                                                        <Setter Property="Margin" Value="25,0,0,0" />
                                                     </MultiDataTrigger.Setters>
                                                 </MultiDataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <hc:LoadingCircle Width="20"
-                                                  Height="20"
-                                                  Margin="10,0,0,0"
-                                                  VerticalAlignment="Center"
-                                                  DotDiameter="4"
-                                                  DotInterval="10">
-                                    <hc:LoadingCircle.Style>
-                                        <Style BasedOn="{StaticResource LoadingBaseStyle}" TargetType="hc:LoadingCircle">
-                                            <Style.Triggers>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding ElementName=showobj, Path=IsEnabled}" Value="false" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <MultiDataTrigger.Setters>
-                                                        <Setter Property="Visibility" Value="Hidden" />
-                                                    </MultiDataTrigger.Setters>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding ElementName=showobj, Path=IsEnabled}" Value="true" />
-                                                        <Condition Binding="{Binding Path=DownloadAllowed}" Value="false" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <MultiDataTrigger.Setters>
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </MultiDataTrigger.Setters>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding ElementName=showobj, Path=IsEnabled}" Value="true" />
-                                                        <Condition Binding="{Binding Path=DownloadAllowed}" Value="true" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <MultiDataTrigger.Setters>
-                                                        <Setter Property="Visibility" Value="Hidden" />
-                                                    </MultiDataTrigger.Setters>
-                                                </MultiDataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </hc:LoadingCircle.Style>
-                                </hc:LoadingCircle>
+
                             </StackPanel>
                         </Button>
                     </StackPanel>

@@ -1,5 +1,4 @@
-﻿using Stylet;
-using lceda_step_downloader.Models.Root;
+﻿using lceda_step_downloader.Models.Root;
 using lceda_step_downloader.Models.Component;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -21,104 +20,50 @@ using System.IO.Compression;
 using System.Net;
 using System.Linq;
 using HandyControl.Controls;
+using System.Windows.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace lceda_step_downloader.ViewModels
 {
-    public class RootViewModel : PropertyChangedBase
+    public partial class RootViewModel : ObservableObject
     {
-        private string _title = "立创EDA 3D模型下载器";
-        public string Title
+        private int _imageLoadVersion;
+        private int _objLoadVersion;
+        [ObservableProperty] private string _title = "立创EDA 3D模型下载器";
+        [ObservableProperty] private bool _downloadAllowed;
+        [ObservableProperty] private ResultItem _selectedItem;
+        [ObservableProperty] private Model3DGroup _myModelGroup;
+        [ObservableProperty] private System.Windows.Media.ImageSource _imageSource;
+        [ObservableProperty] private bool _isImageLoading;
+        [ObservableProperty] private bool _isObjLoading;
+        [ObservableProperty] private Root _searchResult;
+        [ObservableProperty] private Component _selectedComponent;
+        [ObservableProperty] private ObservableCollection<SearchSite> _searchSites;
+        [ObservableProperty] private SearchSite _sSite;
+        [ObservableProperty] private bool _automaticLoadObj;
+
+        partial void OnAutomaticLoadObjChanged(bool value)
         {
-            get { return _title; }
-            set { SetAndNotify(ref _title, value); }
+            if (value && SelectedItem != null)
+            {
+                _ = DownloadObj();
+            }
         }
+
+        partial void OnSelectedItemChanged(ResultItem value)
+        {
+            OnResultSelection();
+        }
+
         private static readonly HttpClient client = new(new HttpClientHandler
         {
             AutomaticDecompression = DecompressionMethods.GZip
         });
 
-        private bool _downloadallowed;
-        public bool DownloadAllowed
-        {
-            get { return _downloadallowed; }
-            set { SetAndNotify(ref _downloadallowed, value); }
-        }
-
-        private ResultItem _selecteditem;
-        public ResultItem Selecteditem
-        {
-            get { return _selecteditem; }
-            set { SetAndNotify(ref _selecteditem, value); }
-        }
-
-        private Model3DGroup _myModelGroup;
-        public Model3DGroup MyModelGroup
-        {
-            get { return _myModelGroup; }
-            set
-            {
-                SetAndNotify(ref _myModelGroup, value);
-
-            }
-        }
-
-        private string _imageSource;
-
-        public string ImageSource
-        {
-            get => _imageSource;
-            set => SetAndNotify(ref _imageSource, value);
-        }
-
-        private Root searchresult;
-        public Root SearchResult
-        {
-            get { return searchresult; }
-            set { SetAndNotify(ref searchresult, value); }
-        }
-
-        private Component _selectedcomponent;
-        public Component SelectedComponent
-        {
-            get { return _selectedcomponent; }
-            set { SetAndNotify(ref _selectedcomponent, value); }
-        }
-        private ObservableCollection<SearchSite> _searchsites;
-
-        public ObservableCollection<SearchSite> SearchSites
-        {
-            get { return _searchsites; }
-            set { _searchsites = value; }
-        }
-        private SearchSite _ssite;
-
-        public SearchSite SSite
-        {
-            get { return _ssite; }
-            set
-            {
-                _ssite = value;
-                Debug.WriteLine(value.Site);
-            }
-        }
-
-        private bool _automaticLoadObj;
-        public bool AutomaticLoadObj
-        {
-            get { return _automaticLoadObj; }
-            set 
-            { 
-                SetAndNotify(ref _automaticLoadObj, value);
-                if (value && Selecteditem != null)
-                {
-                    DownloadObj();
-                }
-            }
-        }
-
         public RootViewModel()
         {
-            Selecteditem = null;
+            SelectedItem = null;
             SearchSites = new ObservableCollection<SearchSite>()
             {
               //new SearchSite(){Site="LCEDA", Value = 0},
@@ -138,6 +83,7 @@ namespace lceda_step_downloader.ViewModels
             }
         }
 
+        [RelayCommand]
         public void DoSearch(string argument)
         {
             Debug.WriteLine(String.Format("搜索关键字: {0}", argument));
@@ -163,84 +109,105 @@ namespace lceda_step_downloader.ViewModels
 
         public void OnResultSelection()
         {
-            if (Selecteditem == null)
+            if (SelectedItem == null)
             {
                 return;
             }
             DownloadAllowed = true;
 
             //部分器件没有图片, 替换成商城LOGO
-            if (Selecteditem.images.Count == 0)
+            if (SelectedItem.images.Count == 0)
             {
-                ImageSource = "https:" + Selecteditem.creator.avatar;
+                LoadImageSource("https:" + SelectedItem.creator.avatar);
                 return;
             }
-            ImageSource = Selecteditem.images[0];
+            LoadImageSource(SelectedItem.images[0]);
             if (AutomaticLoadObj)
             {
-                DownloadObj();
+                _ = DownloadObj();
             }
         }
 
-        public void DownloadObj()
+        [RelayCommand]
+        public async Task DownloadObj()
         {
-            if (Selecteditem == null)
+            if (SelectedItem == null)
             {
                 return;
             }
+            var selectedItem = SelectedItem;
+            var objLoadVersion = ++_objLoadVersion;
             Application.Current.Dispatcher.Invoke(() =>
             {
+                IsObjLoading = true;
                 MyModelGroup = null;
             });
 
-            Debug.WriteLine("准备下载obj:编号{0},标题{1}", SearchResult.result.IndexOf(Selecteditem), Selecteditem.display_title);
-            Debug.WriteLine(Selecteditem.attributes._3D_Model);
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
 
-            if (File.Exists(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj"))
+            Debug.WriteLine("准备下载obj:编号{0},标题{1}", SearchResult.result.IndexOf(selectedItem), selectedItem.display_title);
+            Debug.WriteLine(selectedItem.attributes._3D_Model);
+
+            var tempTitle = GetSafeFileName(selectedItem.title);
+            var objFile = Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj");
+            if (File.Exists(objFile))
             {
                 Debug.WriteLine("存在缓存");
-                Application.Current.Dispatcher.Invoke(() =>
+                try
                 {
-                    ObjReader CurrentHelixObjReader = new();
-                    MyModelGroup = CurrentHelixObjReader.Read(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
-
-                });
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ObjReader CurrentHelixObjReader = new();
+                        MyModelGroup = CurrentHelixObjReader.Read(objFile);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                    Growl.Warning("模型加载失败");
+                }
+                finally
+                {
+                    CompleteObjLoad(objLoadVersion);
+                }
                 return;
             }
-            Task.Run(() => DownloadObjAsync());
+            _ = Task.Run(() => DownloadObjAsync(selectedItem, objLoadVersion));
         }
-
+        
+        [RelayCommand]
         public void DownloadStep()
         {
             //https://pro.lceda.cn/api/components/9059586b8e0c4e2ba21b2ac2c1eb066b?uuid=9059586b8e0c4e2ba21b2ac2c1eb066b&path=0819f05c4eef4c71ace90d822a990e87
             //https://pro.lceda.cn/api/components/105b388c0c03439aa7dbf35dd2b762a6?uuid=105b388c0c03439aa7dbf35dd2b762a6
             //{"success":true,"code":0,"result":{"uuid":"105b388c0c03439aa7dbf35dd2b762a6","modifier":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"creator":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"owner":{"uuid":"0819f05c4eef4c71ace90d822a990e87","username":"LCSC","nickname":"LCSC","avatar":"\/\/image.lceda.cn\/avatars\/2018\/6\/kFlrasi7W06gTdBLAqW3fkrqbDhbowynuSzkjqso.png"},"description":"","docType":16,"dataStr":"{\"model\":\"6d30b5a04660477fbdff168686b01590\",\"type\":\"wrl\",\"src\":\"qfn-56_l7.0-w7.0-p0.40-tl-ep4.0\",\"unit\":\"mm\"}","tags":{"parent_tag":[],"child_tag":[]},"public":true,"source":"","version":1653017104,"type":3,"title":"qfn-56_l7.0-w7.0-p0.40-tl-ep4.0","createTime":1653017104,"updateTime":1658962217,"created_at":"2022-05-20 11:25:04","display_title":"QFN-56_L7.0-W7.0-P0.40-TL-EP4.0","updated_at":"2022-07-28 06:55:05","ticket":1,"std_uuid":"ce2b808f96c74d7981784d534cecd1c0","3d_model_uuid":"6d30b5a04660477fbdff168686b01590","has_device":false,"path":"0819f05c4eef4c71ace90d822a990e87"}}
             //https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/6d30b5a04660477fbdff168686b01590
-            if (Selecteditem == null)
+            if (SelectedItem == null)
             {
                 return;
             }
 
-            Debug.WriteLine("准备下载step:编号{0},标题{1}", SearchResult.result.IndexOf(Selecteditem), Selecteditem.display_title);
-            Debug.WriteLine(Selecteditem.attributes._3D_Model_Transform);
+            Debug.WriteLine("准备下载step:编号{0},标题{1}", SearchResult.result.IndexOf(SelectedItem), SelectedItem.display_title);
+            Debug.WriteLine(SelectedItem.attributes._3D_Model_Transform);
 
             //器件名称
-            //if (File.Exists(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step"))
+            //if (File.Exists(@".\step\" + SelectedItem.title.ToString().Replace("/", "") + @".step"))
             //封装名称
-            if (File.Exists(@".\step\" + Selecteditem.footprint.display_title.ToString().Replace("/", "") + @".step"))
+            if (File.Exists(@".\step\" + SelectedItem.footprint.display_title.ToString().Replace("/", "") + @".step"))
             {
                 Debug.WriteLine("存在step缓存");
                 Growl.Info("STEP文件已存在");
                 return;
             }
             DownloadAllowed = false;
+            IsObjLoading = true;
             Task.Run(() => DownloadStepAsync());
         }
 
         //构造PCB数据, 以利用lceda专业版的PCB导出STEP接口
         public async void DownloadStepAsync()
         {
-            var streamTask = client.GetStreamAsync("https://pro.lceda.cn/api/components/" + Selecteditem.attributes._3D_Model + "?uuid=" + Selecteditem.attributes._3D_Model);
+            var streamTask = client.GetStreamAsync("https://pro.lceda.cn/api/components/" + SelectedItem.attributes._3D_Model + "?uuid=" + SelectedItem.attributes._3D_Model);
 
             SelectedComponent = await JsonSerializer.DeserializeAsync<Component>(await streamTask);
             if (SelectedComponent.code != 0)
@@ -249,34 +216,34 @@ namespace lceda_step_downloader.ViewModels
                 {
                     result = new Result()
                 };
-                SelectedComponent.result._3d_model_uuid = Selecteditem.attributes._3D_Model;
+                SelectedComponent.result._3d_model_uuid = SelectedItem.attributes._3D_Model;
             }
             Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
 
             Stream streamStep = await client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.result._3d_model_uuid);
             //器件名称
-            //var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
+            //var tempTitle = string.Join("_", SelectedItem.title.ToString().Split(Path.GetInvalidFileNameChars()));
             //封装名称
-            var tempTitle = string.Join("_", Selecteditem.footprint.display_title.ToString().ToString().Split(Path.GetInvalidFileNameChars()));
+            var tempTitle = string.Join("_", SelectedItem.footprint.display_title.ToString().ToString().Split(Path.GetInvalidFileNameChars()));
             string fileToWriteTo = Path.Combine(AppContext.BaseDirectory, "step", tempTitle + ".step");
             using Stream streamToWriteTo = File.Open(fileToWriteTo, FileMode.Create);
             await streamStep.CopyToAsync(streamToWriteTo);
             //MediaEle sr = new(await streamStep);
-            //using Stream streamToWriteTo = File.Open(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step", FileMode.Create);
+            //using Stream streamToWriteTo = File.Open(@".\step\" + SelectedItem.title.ToString().Replace("/", "") + @".step", FileMode.Create);
             //await sr.CopyToAsync(streamToWriteTo);
 
-            //StreamWriter stepWriter = new(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step");
+            //StreamWriter stepWriter = new(@".\step\" + SelectedItem.title.ToString().Replace("/", "") + @".step");
 
             //器件模型的变换数据, 以适应lceda的坐标系以及比例, 参数由lc后台维护, 可见lceda的模型也不全是自己画的
-            var model_dx = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[0]) / 10.0;
-            var model_dy = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[1]) / 10.0;
-            var model_dz = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[2]) / 10.0;
-            var model_rz = Convert.ToInt32(Selecteditem.attributes._3D_Model_Transform.Split(',')[3]);
-            var model_rx = Convert.ToInt32(Selecteditem.attributes._3D_Model_Transform.Split(',')[4]);
-            var model_ry = Convert.ToInt32(Selecteditem.attributes._3D_Model_Transform.Split(',')[5]);
-            var model_x = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[6]) / 10.0;
-            var model_y = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[7]) / 10.0;
-            var model_z = Convert.ToDouble(Selecteditem.attributes._3D_Model_Transform.Split(',')[8]) / 10.0 - 49;
+            var model_dx = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[0]) / 10.0;
+            var model_dy = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[1]) / 10.0;
+            var model_dz = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[2]) / 10.0;
+            var model_rz = Convert.ToInt32(SelectedItem.attributes._3D_Model_Transform.Split(',')[3]);
+            var model_rx = Convert.ToInt32(SelectedItem.attributes._3D_Model_Transform.Split(',')[4]);
+            var model_ry = Convert.ToInt32(SelectedItem.attributes._3D_Model_Transform.Split(',')[5]);
+            var model_x = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[6]) / 10.0;
+            var model_y = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[7]) / 10.0;
+            var model_z = Convert.ToDouble(SelectedItem.attributes._3D_Model_Transform.Split(',')[8]) / 10.0 - 49;
 
             //构造的PCB数据
             //var stringPayload =
@@ -307,7 +274,7 @@ namespace lceda_step_downloader.ViewModels
 
             //var streamReader = new StreamReader(responseStream);
 
-            //StreamWriter stepWriter = new(@".\step\" + Selecteditem.title.ToString().Replace("/", "") + @".step");
+            //StreamWriter stepWriter = new(@".\step\" + SelectedItem.title.ToString().Replace("/", "") + @".step");
 
             //如果你上传的PCB数据里只有器件没有PCB, 或者PCB面积过小(<0.5*0.5mm), lc后台都会给你加上PCB
             //所以这里用了个凑活能用的方法:在程序里自动删掉PCB对应实体节点, 可能在某些软件里仍然会显示一个小小的PCB
@@ -329,6 +296,7 @@ namespace lceda_step_downloader.ViewModels
             //stepWriter.Close();
             //stepWriter.Dispose();
             DownloadAllowed = true;
+            IsObjLoading = false;
             Growl.Success("下载成功");
         }
 
@@ -345,63 +313,164 @@ namespace lceda_step_downloader.ViewModels
             return httpContent;
         }
 
-        public async void DownloadObjAsync()
+        private async Task DownloadObjAsync(ResultItem selectedItem, int objLoadVersion)
         {
-            var streamTask = client.GetStreamAsync("https://pro.lceda.cn/api/components/" + Selecteditem.attributes._3D_Model + "?uuid=" + Selecteditem.attributes._3D_Model);
-
-            SelectedComponent = await JsonSerializer.DeserializeAsync<Component>(await streamTask);
-            if (SelectedComponent.code != 0)
+            try
             {
-                SelectedComponent = new Component
-                {
-                    result = new Result
-                    {
-                        _3d_model_uuid = Selecteditem.attributes._3D_Model
-                    }
-                };
-            }
-            Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
+                var streamTask = client.GetStreamAsync("https://pro.lceda.cn/api/components/" + selectedItem.attributes._3D_Model + "?uuid=" + selectedItem.attributes._3D_Model);
 
-            var streamObj = client.GetStreamAsync("https://modules.lceda.cn/3dmodel/" + SelectedComponent.result._3d_model_uuid);
-            ObjMtlSplit(streamObj);
+                SelectedComponent = await JsonSerializer.DeserializeAsync<Component>(await streamTask);
+                if (SelectedComponent.code != 0)
+                {
+                    SelectedComponent = new Component
+                    {
+                        result = new Result
+                        {
+                            _3d_model_uuid = selectedItem.attributes._3D_Model
+                        }
+                    };
+                }
+                Debug.WriteLine(SelectedComponent.result._3d_model_uuid);
+
+                var streamObj = await client.GetStreamAsync("https://modules.lceda.cn/3dmodel/" + SelectedComponent.result._3d_model_uuid);
+                await ObjMtlSplit(streamObj, selectedItem, objLoadVersion);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Growl.Warning("模型加载失败");
+                });
+                CompleteObjLoad(objLoadVersion);
+            }
         }
 
         //lc前端从服务端获取的OBJ模型数据实际上是把mtl和obj写在了一个文件里面, 然后前端再做处理展示, 这里同样需要做分离
-        public async void ObjMtlSplit(Task<Stream> objstream)
+        private async Task ObjMtlSplit(Stream objstream, ResultItem selectedItem, int objLoadVersion)
         {
-            var tempTitle = string.Join("_", Selecteditem.title.ToString().Split(Path.GetInvalidFileNameChars()));
-            StreamWriter objWriter = new(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj"));
-            StreamWriter mtlWriter = new(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".mtl"));
-            //StreamWriter objWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".obj");
-            //StreamWriter mtlWriter = new(@".\temp\" + Selecteditem.title.ToString().Replace("/", "") + @".mtl");
+            var tempTitle = GetSafeFileName(selectedItem.title);
+            var objFile = Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj");
+            var mtlFile = Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".mtl");
+            var objDownloadFile = objFile + ".download";
+            var mtlDownloadFile = mtlFile + ".download";
 
-            objWriter.WriteLine("mtllib " + tempTitle + ".mtl");
-            StreamReader sr = new(await objstream);
-            String readline = string.Empty;
-            while ((readline = sr.ReadLine()) != null)
+            using (StreamWriter objWriter = new(objDownloadFile))
+            using (StreamWriter mtlWriter = new(mtlDownloadFile))
+            using (StreamReader sr = new(objstream))
             {
-                objWriter.WriteLine(readline);
-                if (readline.Contains("newmtl"))
+                await objWriter.WriteLineAsync("mtllib " + tempTitle + ".mtl");
+                string readline = string.Empty;
+                while ((readline = await sr.ReadLineAsync()) != null)
                 {
-                    mtlWriter.WriteLine(readline);
-                    for (var i = 0; i < 3; i++)
+                    await objWriter.WriteLineAsync(readline);
+                    if (readline.Contains("newmtl"))
                     {
-                        readline = sr.ReadLine();
-                        mtlWriter.WriteLine(readline);
+                        await mtlWriter.WriteLineAsync(readline);
+                        for (var i = 0; i < 3; i++)
+                        {
+                            readline = await sr.ReadLineAsync();
+                            await mtlWriter.WriteLineAsync(readline);
+                        }
+                        readline = await sr.ReadLineAsync();
+                        readline = await sr.ReadLineAsync();
+                        await mtlWriter.WriteLineAsync(readline);
                     }
-                    readline = sr.ReadLine();
-                    readline = sr.ReadLine();
-                    mtlWriter.WriteLine(readline);
                 }
+                await mtlWriter.FlushAsync();
+                await objWriter.FlushAsync();
             }
-            mtlWriter.Flush();
-            mtlWriter.Close();
-            objWriter.Flush();
-            objWriter.Close();
+
+            File.Move(mtlDownloadFile, mtlFile, true);
+            File.Move(objDownloadFile, objFile, true);
+
             Application.Current.Dispatcher.Invoke(() =>
             {
                 ObjReader CurrentHelixObjReader = new();
-                MyModelGroup = CurrentHelixObjReader.Read(Path.Combine(AppContext.BaseDirectory, "temp", tempTitle + ".obj"));
+                MyModelGroup = CurrentHelixObjReader.Read(objFile);
+            });
+            CompleteObjLoad(objLoadVersion);
+        }
+
+        private void LoadImageSource(string source)
+        {
+            var imageLoadVersion = ++_imageLoadVersion;
+            IsImageLoading = true;
+            ImageSource = null;
+
+            var normalizedSource = NormalizeImageSource(source);
+            if (string.IsNullOrWhiteSpace(normalizedSource))
+            {
+                CompleteImageLoad(imageLoadVersion);
+                return;
+            }
+
+            try
+            {
+                var bitmapImage = new BitmapImage();
+                bitmapImage.DownloadCompleted += (_, _) => CompleteImageLoad(imageLoadVersion);
+                bitmapImage.DownloadFailed += (_, _) => CompleteImageLoad(imageLoadVersion);
+                bitmapImage.DecodeFailed += (_, _) => CompleteImageLoad(imageLoadVersion);
+                bitmapImage.BeginInit();
+                bitmapImage.UriSource = new Uri(normalizedSource, UriKind.RelativeOrAbsolute);
+                bitmapImage.CacheOption = BitmapCacheOption.Default;
+                bitmapImage.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmapImage.EndInit();
+                ImageSource = bitmapImage;
+
+                if (!bitmapImage.IsDownloading)
+                {
+                    CompleteImageLoad(imageLoadVersion);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                CompleteImageLoad(imageLoadVersion);
+            }
+        }
+
+        private static string NormalizeImageSource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return source;
+            }
+            return source.StartsWith("//") ? "https:" + source : source;
+        }
+
+        private static string GetSafeFileName(string fileName)
+        {
+            return string.Join("_", fileName.ToString().Split(Path.GetInvalidFileNameChars()));
+        }
+
+        private void CompleteImageLoad(int imageLoadVersion)
+        {
+            if (imageLoadVersion != _imageLoadVersion)
+            {
+                return;
+            }
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (imageLoadVersion == _imageLoadVersion)
+                {
+                    IsImageLoading = false;
+                }
+            });
+        }
+
+        private void CompleteObjLoad(int objLoadVersion)
+        {
+            if (objLoadVersion != _objLoadVersion)
+            {
+                return;
+            }
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (objLoadVersion == _objLoadVersion)
+                {
+                    IsObjLoading = false;
+                }
             });
         }
     }
