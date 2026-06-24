@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -144,31 +144,6 @@ namespace lceda_step_downloader.ViewModels
             Debug.WriteLine("准备下载obj:编号{0},标题{1}", SearchResult.result.IndexOf(selectedItem), selectedItem.display_title);
             Debug.WriteLine(selectedItem.attributes._3D_Model);
 
-            Directory.CreateDirectory(TempDirectory);
-            var tempTitle = GetSafeFileName(selectedItem.title);
-            var objFile = Path.Combine(TempDirectory, tempTitle + ".obj");
-            if (File.Exists(objFile))
-            {
-                Debug.WriteLine("存在缓存");
-                try
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        ObjReader CurrentHelixObjReader = new();
-                        MyModelGroup = CurrentHelixObjReader.Read(objFile);
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex);
-                    Growl.Warning("模型加载失败");
-                }
-                finally
-                {
-                    CompleteObjLoad(objLoadVersion);
-                }
-                return;
-            }
             await DownloadObjAsync(selectedItem, objLoadVersion);
         }
 
@@ -349,46 +324,53 @@ namespace lceda_step_downloader.ViewModels
         private async Task ObjMtlSplit(Stream objstream, ResultItem selectedItem, int objLoadVersion)
         {
             var tempTitle = GetSafeFileName(selectedItem.title);
-            Directory.CreateDirectory(TempDirectory);
-            var objFile = Path.Combine(TempDirectory, tempTitle + ".obj");
-            var mtlFile = Path.Combine(TempDirectory, tempTitle + ".mtl");
-            var objDownloadFile = objFile + ".download";
-            var mtlDownloadFile = mtlFile + ".download";
 
-            using (StreamWriter objWriter = new(objDownloadFile))
-            using (StreamWriter mtlWriter = new(mtlDownloadFile))
-            using (StreamReader sr = new(objstream))
+            using (MemoryStream objMs = new MemoryStream())
+            using (MemoryStream mtlMs = new MemoryStream())
             {
-                await objWriter.WriteLineAsync("mtllib " + tempTitle + ".mtl");
-                string readline = string.Empty;
-                while ((readline = await sr.ReadLineAsync()) != null)
+                using (StreamWriter objWriter = new StreamWriter(objMs, new UTF8Encoding(false), 1024, true))
+                using (StreamWriter mtlWriter = new StreamWriter(mtlMs, new UTF8Encoding(false), 1024, true))
+                using (StreamReader sr = new StreamReader(objstream))
                 {
-                    await objWriter.WriteLineAsync(readline);
-                    if (readline.Contains("newmtl"))
+                    string readline = string.Empty;
+                    while ((readline = await sr.ReadLineAsync()) != null)
                     {
-                        await mtlWriter.WriteLineAsync(readline);
-                        for (var i = 0; i < 3; i++)
+                        await objWriter.WriteLineAsync(readline);
+                        if (readline.Contains("newmtl"))
                         {
-                            readline = await sr.ReadLineAsync();
                             await mtlWriter.WriteLineAsync(readline);
+                            for (var i = 0; i < 3; i++)
+                            {
+                                readline = await sr.ReadLineAsync();
+                                if (readline != null) await mtlWriter.WriteLineAsync(readline);
+                            }
+                            readline = await sr.ReadLineAsync(); // discard
+                            readline = await sr.ReadLineAsync();
+                            if (readline != null) await mtlWriter.WriteLineAsync(readline);
                         }
-                        readline = await sr.ReadLineAsync();
-                        readline = await sr.ReadLineAsync();
-                        await mtlWriter.WriteLineAsync(readline);
                     }
+                    await mtlWriter.FlushAsync();
+                    await objWriter.FlushAsync();
                 }
-                await mtlWriter.FlushAsync();
-                await objWriter.FlushAsync();
+
+                objMs.Position = 0;
+                mtlMs.Position = 0;
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        ObjReader CurrentHelixObjReader = new ObjReader();
+                        MyModelGroup = CurrentHelixObjReader.Read(objMs, new Stream[] { mtlMs });
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                        Growl.Warning("模型加载失败");
+                    }
+                });
             }
 
-            File.Move(mtlDownloadFile, mtlFile, true);
-            File.Move(objDownloadFile, objFile, true);
-
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                ObjReader CurrentHelixObjReader = new();
-                MyModelGroup = CurrentHelixObjReader.Read(objFile);
-            });
             CompleteObjLoad(objLoadVersion);
         }
 
@@ -444,13 +426,10 @@ namespace lceda_step_downloader.ViewModels
             return string.Join("_", fileName.ToString().Split(Path.GetInvalidFileNameChars()));
         }
 
-        private static string TempDirectory => Path.Combine(AppContext.BaseDirectory, "temp");
-
         private static string StepDirectory => Path.Combine(AppContext.BaseDirectory, "step");
 
         private static void EnsureModelDirectories()
         {
-            Directory.CreateDirectory(TempDirectory);
             Directory.CreateDirectory(StepDirectory);
         }
 
