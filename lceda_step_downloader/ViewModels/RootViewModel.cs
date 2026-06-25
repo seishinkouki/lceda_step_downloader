@@ -110,7 +110,10 @@ namespace lceda_step_downloader.ViewModels
                 return;
             }
             DownloadAllowed = true;
-
+            if (AutomaticLoadObj)
+            {
+                _ = DownloadObj();
+            }
             //部分器件没有图片, 替换成商城LOGO
             if (SelectedItem.images.Count == 0)
             {
@@ -118,10 +121,6 @@ namespace lceda_step_downloader.ViewModels
                 return;
             }
             LoadImageSource(SelectedItem.images[0]);
-            if (AutomaticLoadObj)
-            {
-                _ = DownloadObj();
-            }
         }
 
         [RelayCommand]
