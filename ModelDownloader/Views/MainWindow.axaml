@@ -1,20 +1,303 @@
-<Window xmlns="https://github.com/avaloniaui"
+<Window x:Class="ModelDownloader.Views.MainWindow"
+        xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:ModelDownloader.ViewModels"
+        xmlns:controls="using:ModelDownloader.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        x:Class="ModelDownloader.Views.MainWindow"
+        xmlns:vm="using:ModelDownloader.ViewModels"
+        Title=""
+        Width="700"
+        Height="600"
+        d:DesignHeight="450"
+        d:DesignWidth="600"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="ModelDownloader">
+        CanMaximize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        Icon="/Assets/logo256.ico"
+        mc:Ignorable="d">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel />
     </Design.DataContext>
+    <Window.Styles>
+        <Style Selector="WindowDrawnDecorations /template/ Button#PART_MaximizeButton">
+            <Setter Property="Width" Value="0" />
+        </Style>
+        <Style Selector="WindowDrawnDecorations /template/ Button#PART_RestoreButton">
+            <Setter Property="Width" Value="0" />
+        </Style>
+        <Style Selector="WindowDrawnDecorations /template/ Button#PART_FullScreenButton">
+            <Setter Property="Width" Value="0" />
+        </Style>
+    </Window.Styles>
+    <Window.Resources>
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="TitleBarBackground" Color="Transparent" />
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Height="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Margin="0,3,0,3"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Image Margin="4,3,0,3"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False"
+                       Source="/Assets/logo256.ico" />
+                <ComboBox MinHeight="26"
+                          Margin="6,0,0,0"
+                          ItemsSource="{Binding SearchSource}"
+                          SelectedItem="{Binding SelectedSearchSource}" />
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBox x:Name="SearchBox"
+                     Grid.Column="1"
+                     MinWidth="200"
+                     MinHeight="26"
+                     Margin="4,3,0,3"
+                     HorizontalAlignment="Left"
+                     IsEnabled="{Binding !SearchCommand.IsRunning}">
+                <TextBox.KeyBindings>
+                    <KeyBinding Command="{Binding SearchCommand}"
+                                CommandParameter="{Binding #SearchBox.Text}"
+                                Gesture="Enter" />
+                </TextBox.KeyBindings>
+                <TextBox.InnerRightContent>
+                    <Button x:Name="SearchButton"
+                            Width="24"
+                            Height="24"
+                            MinWidth="24"
+                            MinHeight="24"
+                            Margin="0,0,-12,0"
+                            Padding="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Background="transparent"
+                            BorderThickness="0"
+                            Classes="Tertiary"
+                            Command="{Binding SearchCommand}"
+                            CommandParameter="{Binding #SearchBox.Text}"
+                            CornerRadius="4">
+                        <PathIcon Width="16"
+                                  Height="16"
+                                  Data="{StaticResource SemiIconSearchStroked}" />
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#1FFFFFFF" />
+                            </Style>
+                            <Style Selector="Button:pressed /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#2FFFFFFF" />
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </TextBox.InnerRightContent>
+            </TextBox>
+            <StackPanel Grid.Column="2"
+                        Margin="0,0,64,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button Width="32"
+                        Height="32"
+                        Padding="0"
+                        Background="{DynamicResource ButtonBorderlessBackground}"
+                        Classes="Tertiary">
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                            <Grid Width="350" MaxHeight="450">
+                                <TabControl>
+                                    <TabItem Header="待下载">
+                                        <Grid RowDefinitions="*,Auto">
+                                            <ScrollViewer Grid.Row="0">
+                                                <ItemsControl ItemsSource="{Binding StagedDownloads}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,5" ColumnDefinitions="*,Auto">
+                                                                <TextBlock MaxWidth="250"
+                                                                           VerticalAlignment="Center"
+                                                                           Text="{Binding Model.DisplayTitle}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <Button Grid.Column="1"
+                                                                        Padding="4"
+                                                                        Background="Transparent"
+                                                                        BorderThickness="0"
+                                                                        Command="{Binding $parent[Window].DataContext.RemoveStagedCommand}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <PathIcon Width="12"
+                                                                              Height="12"
+                                                                              Data="{StaticResource SemiIconClose}" />
+                                                                </Button>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                            <Button Grid.Row="1"
+                                                    Margin="0,10,0,0"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Center"
+                                                    Classes="Primary"
+                                                    Command="{Binding DownloadBatchCommand}"
+                                                    Content="开始批量下载" />
+                                        </Grid>
+                                    </TabItem>
+                                    <TabItem Header="下载中">
+                                        <ScrollViewer>
+                                            <ItemsControl ItemsSource="{Binding DownloadQueue}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,5" RowDefinitions="Auto,Auto">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock MaxWidth="200"
+                                                                           Margin="5,0,0,0"
+                                                                           HorizontalAlignment="Left"
+                                                                           Text="{Binding Title}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="1"
+                                                                           FontSize="12"
+                                                                           Foreground="Gray"
+                                                                           Text="{Binding StatusText}" />
+                                                            </Grid>
+                                                            <ProgressBar Grid.Row="1"
+                                                                         Height="4"
+                                                                         Margin="0,5,0,0"
+                                                                         Maximum="100"
+                                                                         Value="{Binding Progress}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </TabItem>
+                                </TabControl>
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                    <PathIcon Width="18"
+                              Height="18"
+                              Data="{StaticResource SemiIconDownload}" />
+                </Button>
+                <ToggleButton Width="32"
+                              Height="32"
+                              Padding="0"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              Background="{DynamicResource ButtonBorderlessBackground}"
+                              BorderThickness="0"
+                              Classes="Tertiary"
+                              IsChecked="{x:Null}"
+                              IsCheckedChanged="ThemeButton_OnIsCheckedChanged"
+                              IsThreeState="True"
+                              ToolTip.Tip="切换主题">
+                    <ToggleButton.Styles>
+                        <Style Selector="ToggleButton PathIcon">
+                            <Setter Property="Data" Value="{StaticResource SemiIconSun}" />
+                        </Style>
+                        <Style Selector="ToggleButton:checked PathIcon">
+                            <Setter Property="Data" Value="{StaticResource SemiIconMoon}" />
+                        </Style>
+                        <Style Selector="ToggleButton:indeterminate PathIcon">
+                            <Setter Property="Data" Value="{StaticResource SemiIconContrast}" />
+                        </Style>
+                        <Style Selector="ToggleButton:checked /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="#1FFFFFFF" />
+                        </Style>
+                    </ToggleButton.Styles>
+                    <PathIcon Width="16" Height="16" />
+                </ToggleButton>
+            </StackPanel>
+        </Grid>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ListBox Background="Transparent"
+                     Grid.IsSharedSizeScope="True"
+                     IsEnabled="{Binding !IsBusy}"
+                     ItemsSource="{Binding SearchResult}"
+                     SelectedItem="{Binding SelectedSearchResult}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="24" Margin="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TitleColumn" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
+                            <CheckBox Grid.Column="0"
+                                      Margin="0,0,10,0"
+                                      VerticalAlignment="Center"
+                                      Command="{Binding $parent[Window].DataContext.ToggleStageCommand}"
+                                      CommandParameter="{Binding}"
+                                      IsChecked="{Binding IsChecked}" />
+
+                            <TextBlock Grid.Column="1"
+                                       Margin="0,0,20,0"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding Model.DisplayTitle}" />
+
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding Model.Attributes[Manufacturer]}" />
+
+                            <Button Grid.Column="3"
+                                    Padding="4"
+                                    Background="{DynamicResource ButtonBorderlessBackground}"
+                                    BorderThickness="0"
+                                    Classes="Tertiary"
+                                    Command="{Binding $parent[Window].DataContext.DownloadStepCommand}"
+                                    CommandParameter="{Binding}"
+                                    IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
+                                <PathIcon Width="18"
+                                          Height="18"
+                                          Data="{StaticResource SemiIconDownload}" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <Grid Grid.Column="1" MinWidth="300">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Image x:Name="PreviewImage" Source="{Binding CurrentImageSource}" />
+                <ProgressBar Width="100"
+                             Height="100"
+                             IsIndeterminate="True"
+                             IsVisible="{Binding IsImageLoading}"
+                             Theme="{StaticResource ProgressRing}" />
+                <controls:ModelViewer x:Name="Viewer"
+                                      Grid.Row="1"
+                                      Source="{Binding SelectedModelSource}" />
+                <controls:ViewCubeControl Grid.Row="1"
+                                          Width="50"
+                                          Height="50"
+                                          Margin="10"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Bottom"
+                                          TargetViewer="{Binding #Viewer}" />
+                <ProgressBar Grid.Row="1"
+                             Width="100"
+                             Height="100"
+                             IsIndeterminate="True"
+                             IsVisible="{Binding IsModelLoading}"
+                             Theme="{StaticResource ProgressRing}" />
+            </Grid>
+        </Grid>
+    </Grid>
 </Window>
