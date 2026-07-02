@@ -16,6 +16,14 @@ namespace ModelDownloader
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
+                .With(new AvaloniaNativePlatformOptions
+                {
+                    RenderingMode =
+                    [
+                        AvaloniaNativeRenderingMode.OpenGl,
+                        AvaloniaNativeRenderingMode.Software
+                    ]
+                })
 #if DEBUG
                 .WithDeveloperTools()
 #endif
