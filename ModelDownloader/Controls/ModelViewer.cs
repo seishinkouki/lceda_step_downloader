@@ -325,7 +325,7 @@ public class ModelViewer : OpenGlControlBase
             maxX = float.MinValue; maxY = float.MinValue; maxZ = float.MinValue;
 
             var vertices = new List<VertexData>();
-            var indices = new List<ushort>();
+            var indices = new List<uint>();
 
             ProcessNode(scene->MRootNode, scene, vertices, indices, parsedMaterials);
 
@@ -357,9 +357,9 @@ public class ModelViewer : OpenGlControlBase
 
             _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
             var indicesArray = indices.ToArray();
-            fixed (ushort* i = indicesArray)
+            fixed (uint* i = indicesArray)
             {
-                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indicesArray.Length * sizeof(ushort)), i, BufferUsageARB.StaticDraw);
+                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indicesArray.Length * sizeof(uint)), i, BufferUsageARB.StaticDraw);
             }
 
             _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)sizeof(VertexData), (void*)0);
@@ -419,7 +419,7 @@ public class ModelViewer : OpenGlControlBase
         return materials;
     }
 
-    private unsafe void ProcessNode(Node* node, Scene* scene, List<VertexData> vertices, List<ushort> indices, Dictionary<string, Vector3> parsedMaterials)
+    private unsafe void ProcessNode(Node* node, Scene* scene, List<VertexData> vertices, List<uint> indices, Dictionary<string, Vector3> parsedMaterials)
     {
         for (uint i = 0; i < node->MNumMeshes; i++)
         {
@@ -433,7 +433,7 @@ public class ModelViewer : OpenGlControlBase
         }
     }
 
-    private unsafe void ProcessMesh(Mesh* mesh, Scene* scene, List<VertexData> vertices, List<ushort> indices, Dictionary<string, Vector3> parsedMaterials)
+    private unsafe void ProcessMesh(Mesh* mesh, Scene* scene, List<VertexData> vertices, List<uint> indices, Dictionary<string, Vector3> parsedMaterials)
     {
         var startIndex = (uint)vertices.Count;
 
@@ -488,7 +488,7 @@ public class ModelViewer : OpenGlControlBase
             var face = mesh->MFaces[i];
             for (uint j = 0; j < face.MNumIndices; j++)
             {
-                indices.Add((ushort)(startIndex + face.MIndices[j]));
+                indices.Add((uint)(startIndex + face.MIndices[j]));
             }
         }
     }
@@ -620,7 +620,7 @@ public class ModelViewer : OpenGlControlBase
 
         _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
 
-        _gl.DrawElements(Silk.NET.OpenGL.PrimitiveType.Triangles, (uint)_indexCount, DrawElementsType.UnsignedShort, (void*)0);
+        _gl.DrawElements(Silk.NET.OpenGL.PrimitiveType.Triangles, (uint)_indexCount, DrawElementsType.UnsignedInt, (void*)0);
 
         _gl.BindVertexArray(0);
 
