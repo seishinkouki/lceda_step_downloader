@@ -152,6 +152,7 @@ namespace ModelDownloader.ViewModels
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error loading 3D preview: {ex}");
                 Debug.WriteLine(ex);
             }
         }

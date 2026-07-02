@@ -86,11 +86,7 @@ public class ModelViewer : OpenGlControlBase
     private uint _ebo;
     private uint _shaderProgram;
     private int _indexCount;
-
-    private uint _myFbo;
-    private uint _myColorRbo;
-    private uint _myDepthRbo;
-    private int _fboWidth, _fboHeight;
+    private string? _shaderError;
 
     private bool _needsLoad = false;
 
@@ -129,11 +125,18 @@ public class ModelViewer : OpenGlControlBase
         _gl = GL.GetApi(new AvaloniaNativeContext(gl));
         _assimp = Silk.NET.Assimp.Assimp.GetApi();
 
+        Console.WriteLine($"OpenGL initialized: {GlVersion}");
         InitializeGraphics();
         if (Source != null)
         {
             LoadModel();
         }
+    }
+
+    protected override void OnOpenGlLost()
+    {
+        Console.WriteLine("OpenGL context lost");
+        base.OnOpenGlLost();
     }
 
     protected override void OnOpenGlDeinit(GlInterface gl)
@@ -145,67 +148,24 @@ public class ModelViewer : OpenGlControlBase
         _gl.DeleteBuffer(_ebo);
         _gl.DeleteProgram(_shaderProgram);
 
-        if (_myFbo != 0)
-        {
-            _gl.DeleteFramebuffer(_myFbo);
-            _gl.DeleteRenderbuffer(_myColorRbo);
-            _gl.DeleteRenderbuffer(_myDepthRbo);
-        }
-
         _assimp?.Dispose();
         _gl?.Dispose();
         base.OnOpenGlDeinit(gl);
-    }
-
-    private unsafe void EnsureFbo(int width, int height)
-    {
-        if (_fboWidth == width && _fboHeight == height && _myFbo != 0) return;
-        if (_gl == null) return;
-        if (_myFbo != 0)
-        {
-            _gl.DeleteFramebuffer(_myFbo);
-            _gl.DeleteRenderbuffer(_myColorRbo);
-            _gl.DeleteRenderbuffer(_myDepthRbo);
-        }
-
-        _fboWidth = width;
-        _fboHeight = height;
-
-        uint samples = 4; // 4x MSAA Anti-Aliasing
-
-        _myFbo = _gl.GenFramebuffer();
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _myFbo);
-
-        _myColorRbo = _gl.GenRenderbuffer();
-        _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _myColorRbo);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, samples, InternalFormat.Rgba8, (uint)width, (uint)height);
-        _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, RenderbufferTarget.Renderbuffer, _myColorRbo);
-
-        _myDepthRbo = _gl.GenRenderbuffer();
-        _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _myDepthRbo);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, samples, InternalFormat.DepthComponent24, (uint)width, (uint)height);
-        _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, _myDepthRbo);
-
-        var status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
-        if (status != GLEnum.FramebufferComplete)
-        {
-            Console.WriteLine($"FBO error: {status}");
-        }
-
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
 
     private unsafe void InitializeGraphics()
     {
         if (_gl == null) return;
 
-        string glslVersion = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "#version 330 core" : "#version 300 es";
+        bool isGles = GlVersion.Type == GlProfileType.OpenGLES;
+        string glslVersion = isGles ? "#version 300 es" : "#version 150";
+        string precision = isGles ? "precision mediump float;\n" : "";
 
         string vertexShaderCode = @"
-            layout (location = 0) in vec3 aPos;
-            layout (location = 1) in vec3 aNormal;
-            layout (location = 2) in vec2 aTexCoords;
-            layout (location = 3) in vec3 aColor;
+            in vec3 aPos;
+            in vec3 aNormal;
+            in vec2 aTexCoords;
+            in vec3 aColor;
 
             out vec3 FragPos;
             out vec3 Normal;
@@ -251,24 +211,41 @@ public class ModelViewer : OpenGlControlBase
                 FragColor = vec4(result, 1.0);
             }";
 
-        string vertexShaderSource = $"{glslVersion}\nprecision mediump float;\n{vertexShaderCode}".Replace("\r", "");
-        string fragmentShaderSource = $"{glslVersion}\nprecision mediump float;\n{fragmentShaderCode}".Replace("\r", "");
+        string vertexShaderSource = $"{glslVersion}\n{precision}{vertexShaderCode}".Replace("\r", "");
+        string fragmentShaderSource = $"{glslVersion}\n{precision}{fragmentShaderCode}".Replace("\r", "");
 
         uint vertexShader = _gl.CreateShader(ShaderType.VertexShader);
         _gl.ShaderSource(vertexShader, vertexShaderSource);
         _gl.CompileShader(vertexShader);
-        CheckShaderCompileError(vertexShader);
+        if (!CheckShaderCompileError(vertexShader, "vertex"))
+        {
+            _gl.DeleteShader(vertexShader);
+            return;
+        }
 
         var fragmentShader = _gl.CreateShader(ShaderType.FragmentShader);
         _gl.ShaderSource(fragmentShader, fragmentShaderSource);
         _gl.CompileShader(fragmentShader);
-        CheckShaderCompileError(fragmentShader);
+        if (!CheckShaderCompileError(fragmentShader, "fragment"))
+        {
+            _gl.DeleteShader(vertexShader);
+            _gl.DeleteShader(fragmentShader);
+            return;
+        }
 
         _shaderProgram = _gl.CreateProgram();
         _gl.AttachShader(_shaderProgram, vertexShader);
         _gl.AttachShader(_shaderProgram, fragmentShader);
+        _gl.BindAttribLocation(_shaderProgram, 0, "aPos");
+        _gl.BindAttribLocation(_shaderProgram, 1, "aNormal");
+        _gl.BindAttribLocation(_shaderProgram, 2, "aTexCoords");
+        _gl.BindAttribLocation(_shaderProgram, 3, "aColor");
         _gl.LinkProgram(_shaderProgram);
-        CheckProgramLinkError(_shaderProgram);
+        if (!CheckProgramLinkError(_shaderProgram))
+        {
+            _gl.DeleteProgram(_shaderProgram);
+            _shaderProgram = 0;
+        }
 
         _gl.DeleteShader(vertexShader);
         _gl.DeleteShader(fragmentShader);
@@ -276,24 +253,31 @@ public class ModelViewer : OpenGlControlBase
         _gl.Enable(EnableCap.Blend);
     }
 
-    private void CheckShaderCompileError(uint shader)
+    private bool CheckShaderCompileError(uint shader, string stage)
     {
         _gl!.GetShader(shader, ShaderParameterName.CompileStatus, out int status);
         if (status == 0)
         {
             string infoLog = _gl.GetShaderInfoLog(shader);
-            Console.WriteLine($"Error compiling shader: {infoLog}");
+            _shaderError = $"{stage} shader compile failed for {GlVersion}: {infoLog}";
+            Console.WriteLine(_shaderError);
+            return false;
         }
+        return true;
     }
 
-    private void CheckProgramLinkError(uint program)
+    private bool CheckProgramLinkError(uint program)
     {
         _gl!.GetProgram(program, ProgramPropertyARB.LinkStatus, out int status);
         if (status == 0)
         {
             string infoLog = _gl.GetProgramInfoLog(program);
-            Console.WriteLine($"Error linking program: {infoLog}");
+            _shaderError = $"Shader link failed for {GlVersion}: {infoLog}";
+            Console.WriteLine(_shaderError);
+            return false;
         }
+        _shaderError = null;
+        return true;
     }
 
     private unsafe void LoadModel()
@@ -546,12 +530,10 @@ public class ModelViewer : OpenGlControlBase
         int h = (int)(Bounds.Height * scaling);
 
         if (w <= 0 || h <= 0) return;
+        if (_shaderProgram == 0) return;
 
-        EnsureFbo(w, h);
-
-        // Bind our custom FBO
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _myFbo);
-        _gl.Enable(EnableCap.DepthTest); // Enable depth test for our FBO!
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)fb);
+        _gl.Enable(EnableCap.DepthTest);
 
         var isDark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
         if (isDark)
@@ -641,14 +623,6 @@ public class ModelViewer : OpenGlControlBase
         _gl.DrawElements(Silk.NET.OpenGL.PrimitiveType.Triangles, (uint)_indexCount, DrawElementsType.UnsignedShort, (void*)0);
 
         _gl.BindVertexArray(0);
-
-        // Blit custom FBO to Avalonia FBO
-        _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _myFbo);
-        _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)fb);
-        _gl.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-
-        // Restore binding to fb
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)fb);
 
         // Clean up GL state so Skia can render 2D UI properly
         _gl.Disable(EnableCap.DepthTest);
