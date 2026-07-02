@@ -47,6 +47,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Margin="0,3,0,3"
+                        x:Name="TitleBarLeftPanel"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
                 <Image Margin="4,3,0,3"
@@ -102,6 +103,7 @@
                 </TextBox.InnerRightContent>
             </TextBox>
             <StackPanel Grid.Column="2"
+                        x:Name="TitleBarRightPanel"
                         Margin="0,0,64,0"
                         HorizontalAlignment="Right"
                         Orientation="Horizontal">

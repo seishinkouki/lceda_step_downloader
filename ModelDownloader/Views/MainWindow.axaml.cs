@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -11,6 +12,11 @@ namespace ModelDownloader.Views
         public MainWindow()
         {
             InitializeComponent();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                TitleBarRightPanel.Margin = new Thickness(0, 0, 0, 0);
+                TitleBarLeftPanel.Margin = new Thickness(50, 3, 0, 3);
+            }
         }
         private void ThemeButton_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
         {
