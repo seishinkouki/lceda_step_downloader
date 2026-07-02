@@ -259,3 +259,12 @@ public class DataStrContent
     [JsonPropertyName("unit")]
     public string? Unit { get; set; }
 }
+
+[JsonSerializable(typeof(LCSCResult))]
+[JsonSerializable(typeof(ResultItem))]
+[JsonSerializable(typeof(FootprintInfo))]
+[JsonSerializable(typeof(Model3DComponent))]
+[JsonSerializable(typeof(Model3DDetail))]
+public partial class CustomJsonSerializerContext : JsonSerializerContext
+{
+}

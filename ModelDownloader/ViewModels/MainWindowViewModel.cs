@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -125,7 +125,7 @@ namespace ModelDownloader.ViewModels
             {
                 if (SelectedSearchSource == "立创商城")
                 {
-                    var res = await Client.GetFromJsonAsync<LCSCResult>("https://pro.lceda.cn/api/szlcsc/eda/product/list?wd=" + keyword);
+                    var res = await Client.GetFromJsonAsync<LCSCResult>("https://pro.lceda.cn/api/szlcsc/eda/product/list?wd=" + keyword, CustomJsonSerializerContext.Default.LCSCResult);
                     if (res != null && res.Result != null)
                     {
                         SearchResult.Clear();
@@ -173,7 +173,7 @@ namespace ModelDownloader.ViewModels
                     return;
                 }
 
-                var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID);
+                var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID, CustomJsonSerializerContext.Default.Model3DComponent);
                 var url = "https://modules.lceda.cn/3dmodel/" + SelectedComponent?.Result?.Model3DUuid + "?path=" + SelectedComponent?.Result?.Path;
                 var streamObj = await Client.GetStreamAsync(url);
                 var (objBytes, mtlBytes) = await ObjMtlSplitToBytes(streamObj);
@@ -247,10 +247,10 @@ namespace ModelDownloader.ViewModels
         public async Task DownloadStep(ResultItemViewModel? item)
         {
             if (item == null) return;
-            
+
             var task = new DownloadTask { Title = item.Model.DisplayTitle ?? "未知", StatusText = "下载中..." };
             DownloadQueue.Add(task);
-            
+
             try
             {
                 await DownloadStepAsync(item.Model, Path.Combine(AppContext.BaseDirectory, "step"));
@@ -289,7 +289,7 @@ namespace ModelDownloader.ViewModels
         {
             var itemsToDownload = StagedDownloads.ToList();
             StagedDownloads.Clear();
-            
+
             foreach (var item in itemsToDownload)
             {
                 // Uncheck them from search results UI if visible
@@ -301,7 +301,7 @@ namespace ModelDownloader.ViewModels
         private async Task DownloadStepAsync(ResultItem item, string targetFolder)
         {
             if (item == null || item.Attributes == null || !item.Attributes.TryGetValue("3D Model", out var model3DUUID)) return;
-            var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID);
+            var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID, CustomJsonSerializerContext.Default.Model3DComponent);
             if (SelectedComponent == null || SelectedComponent.Result == null) return;
             var streamStep = await Client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.Result.Model3DUuid);
 
