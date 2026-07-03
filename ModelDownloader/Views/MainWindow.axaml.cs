@@ -14,8 +14,10 @@ namespace ModelDownloader.Views
             InitializeComponent();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                TitleBarRightPanel.Margin = new Thickness(0, 0, 0, 0);
-                TitleBarLeftPanel.Margin = new Thickness(50, 3, 0, 3);
+                Title = "立创商城 STEP 下载器";
+                ExtendClientAreaToDecorationsHint = false;
+                CanMaximize = true;
+                TitleBarRightPanel.Margin = new Thickness(0);
             }
         }
         private void ThemeButton_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
