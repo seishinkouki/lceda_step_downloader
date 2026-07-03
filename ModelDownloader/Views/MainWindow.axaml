@@ -8,6 +8,8 @@
         Title=""
         Width="700"
         Height="600"
+        MinWidth="700"
+        MinHeight="600"
         d:DesignHeight="450"
         d:DesignWidth="600"
         x:DataType="vm:MainWindowViewModel"
