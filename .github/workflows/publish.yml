@@ -1,0 +1,72 @@
+name: Publish
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        aot: [false, true]
+    name: Windows x64${{ matrix.aot && ' (AOT)' || '' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: dotnet publish ModelDownloader.slnx -c Release -r win-x64 --self-contained true /p:PublishAot=${{ matrix.aot }} /p:PublishTrimmed=true /p:TrimMode=full /p:DebugType=none /p:DebugSymbols=false
+
+      - name: Set artifact name
+        id: vars
+        shell: powershell
+        run: |
+          if ('${{ matrix.aot }}' -eq 'true') {
+            echo "name=ModelDownloader-win-x64-aot" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "name=ModelDownloader-win-x64" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Pack artifact
+        shell: powershell
+        run: |
+          $src = "ModelDownloader\bin\Release\net10.0\win-x64\publish\"
+          $name = "${{ steps.vars.outputs.name }}.zip"
+          Compress-Archive -Path "$src*" -DestinationPath $name
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.vars.outputs.name }}
+          path: ${{ steps.vars.outputs.name }}.zip
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ModelDownloader-win-x64/ModelDownloader-win-x64.zip
+            ModelDownloader-win-x64-aot/ModelDownloader-win-x64-aot.zip
+          generate_release_notes: true

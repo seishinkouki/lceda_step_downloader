@@ -4,13 +4,23 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\logo256.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>false</PublishAot>
+    <BuiltInComInteropSupport Condition="'$(PublishAot)' == 'true'">true</BuiltInComInteropSupport>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Silk.NET.Assimp" />
+    <TrimmerRootAssembly Include="Silk.NET.OpenGL" />
+    <TrimmerRootAssembly Include="Semi.Avalonia" />
   </ItemGroup>
 
   <ItemGroup>
