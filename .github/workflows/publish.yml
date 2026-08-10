@@ -31,9 +31,12 @@ jobs:
       - name: Publish
         run: dotnet publish ModelDownloader.slnx -c Release -r win-x64 --self-contained true /p:PublishAot=${{ matrix.aot }} /p:PublishSingleFile=${{ matrix.aot && 'false' || 'true' }} /p:PublishTrimmed=true /p:TrimMode=full /p:DebugType=none /p:DebugSymbols=false
 
-      - name: Clean PDB
+      - name: Clean artifacts
         shell: powershell
-        run: Remove-Item -Path "ModelDownloader\bin\Release\net10.0\win-x64\publish\*.pdb" -Force -ErrorAction SilentlyContinue
+        run: |
+          $pub = "ModelDownloader\bin\Release\net10.0\win-x64\publish\"
+          Remove-Item -Path "$pub*.pdb" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "$pub*.lib" -Force -ErrorAction SilentlyContinue
 
       - name: Set artifact name
         id: vars
