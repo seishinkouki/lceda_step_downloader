@@ -9,7 +9,6 @@ using Avalonia.Media;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Avalonia.Threading;
-using Silk.NET.Assimp;
 using Silk.NET.Core.Contexts;
 using Silk.NET.OpenGL;
 
@@ -79,7 +78,6 @@ public class ModelViewer : OpenGlControlBase
     {
         Focusable = true;
     }
-    private Silk.NET.Assimp.Assimp? _assimp;
 
     private uint _vao;
     private uint _vbo;
@@ -123,7 +121,6 @@ public class ModelViewer : OpenGlControlBase
         base.OnOpenGlInit(gl);
 
         _gl = GL.GetApi(new AvaloniaNativeContext(gl));
-        _assimp = Silk.NET.Assimp.Assimp.GetApi();
 
         Console.WriteLine($"OpenGL initialized: {GlVersion}");
         InitializeGraphics();
@@ -148,7 +145,6 @@ public class ModelViewer : OpenGlControlBase
         _gl.DeleteBuffer(_ebo);
         _gl.DeleteProgram(_shaderProgram);
 
-        _assimp?.Dispose();
         _gl?.Dispose();
         base.OnOpenGlDeinit(gl);
     }
@@ -284,36 +280,21 @@ public class ModelViewer : OpenGlControlBase
     {
         try
         {
-            if (_gl == null || _assimp == null) return;
+            if (_gl == null) return;
             if (Source == null || Source.ObjStream == null)
             {
                 Console.WriteLine("Model source or ObjStream is null");
                 return;
             }
 
-            var parsedMaterials = ParseMtlStream(Source.MtlStream);
+            var materials = ParseMtlStream(Source.MtlStream);
 
-            byte[] objBytes;
-            using (var memoryStream = new MemoryStream())
-            {
-                Source.ObjStream.Position = 0;
-                Source.ObjStream.CopyTo(memoryStream);
-                objBytes = memoryStream.ToArray();
-            }
+            var parser = new ObjParser();
+            var result = parser.Parse(Source.ObjStream, materials);
 
-            Silk.NET.Assimp.Scene* scene;
-            fixed (byte* pObj = objBytes)
+            if (result.Vertices.Count == 0)
             {
-                byte[] hint = System.Text.Encoding.UTF8.GetBytes("obj\0");
-                fixed (byte* pHint = hint)
-                {
-                    scene = _assimp.ImportFileFromMemory(pObj, (uint)objBytes.Length, (uint)(PostProcessSteps.Triangulate | PostProcessSteps.GenerateNormals | PostProcessSteps.FlipUVs), pHint);
-                }
-            }
-
-            if (scene == null || scene->MFlags == Silk.NET.Assimp.Assimp.SceneFlagsIncomplete || scene->MRootNode == null)
-            {
-                Console.WriteLine($"Error loading model: {_assimp.GetErrorStringS()}");
+                Console.WriteLine("No vertices parsed from OBJ");
                 return;
             }
 
@@ -324,23 +305,29 @@ public class ModelViewer : OpenGlControlBase
             minX = float.MaxValue; minY = float.MaxValue; minZ = float.MaxValue;
             maxX = float.MinValue; maxY = float.MinValue; maxZ = float.MinValue;
 
-            var vertices = new List<VertexData>();
-            var indices = new List<uint>();
-
-            ProcessNode(scene->MRootNode, scene, vertices, indices, parsedMaterials);
-
-            foreach (var v in vertices)
+            var glVertices = new VertexData[result.Vertices.Count];
+            for (int i = 0; i < result.Vertices.Count; i++)
             {
-                if (v.Position.X < minX) minX = v.Position.X;
-                if (v.Position.Y < minY) minY = v.Position.Y;
-                if (v.Position.Z < minZ) minZ = v.Position.Z;
-                if (v.Position.X > maxX) maxX = v.Position.X;
-                if (v.Position.Y > maxY) maxY = v.Position.Y;
-                if (v.Position.Z > maxZ) maxZ = v.Position.Z;
+                var src = result.Vertices[i];
+                glVertices[i] = new VertexData
+                {
+                    Position = src.Position,
+                    Normal = src.Normal,
+                    TexCoords = src.TexCoords,
+                    Color = src.Color
+                };
+
+                var p = src.Position;
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.Z < minZ) minZ = p.Z;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+                if (p.Z > maxZ) maxZ = p.Z;
             }
 
-            _indexCount = indices.Count;
-            Console.WriteLine($"Model loaded successfully. Vertices: {vertices.Count}, Indices: {_indexCount}");
+            _indexCount = result.Indices.Count;
+            Console.WriteLine($"Model loaded successfully. Vertices: {glVertices.Length}, Indices: {_indexCount}");
 
             _vao = _gl.GenVertexArray();
             _vbo = _gl.GenBuffer();
@@ -349,17 +336,22 @@ public class ModelViewer : OpenGlControlBase
             _gl.BindVertexArray(_vao);
 
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-            var verticesArray = vertices.ToArray();
-            fixed (VertexData* v = verticesArray)
+            unsafe
             {
-                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(verticesArray.Length * sizeof(VertexData)), v, BufferUsageARB.StaticDraw);
+                fixed (VertexData* v = glVertices)
+                {
+                    _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(glVertices.Length * sizeof(VertexData)), v, BufferUsageARB.StaticDraw);
+                }
             }
 
             _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
-            var indicesArray = indices.ToArray();
-            fixed (uint* i = indicesArray)
+            var indicesArray = result.Indices.ToArray();
+            unsafe
             {
-                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indicesArray.Length * sizeof(uint)), i, BufferUsageARB.StaticDraw);
+                fixed (uint* i = indicesArray)
+                {
+                    _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indicesArray.Length * sizeof(uint)), i, BufferUsageARB.StaticDraw);
+                }
             }
 
             _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)sizeof(VertexData), (void*)0);
@@ -372,7 +364,6 @@ public class ModelViewer : OpenGlControlBase
             _gl.EnableVertexAttribArray(2);
 
             _gl.BindVertexArray(0);
-            _assimp.ReleaseImport(scene);
         }
         catch (Exception ex)
         {
@@ -417,80 +408,6 @@ public class ModelViewer : OpenGlControlBase
             Console.WriteLine($"Error parsing MTL stream: {ex}");
         }
         return materials;
-    }
-
-    private unsafe void ProcessNode(Node* node, Scene* scene, List<VertexData> vertices, List<uint> indices, Dictionary<string, Vector3> parsedMaterials)
-    {
-        for (uint i = 0; i < node->MNumMeshes; i++)
-        {
-            Mesh* mesh = scene->MMeshes[node->MMeshes[i]];
-            ProcessMesh(mesh, scene, vertices, indices, parsedMaterials);
-        }
-
-        for (uint i = 0; i < node->MNumChildren; i++)
-        {
-            ProcessNode(node->MChildren[i], scene, vertices, indices, parsedMaterials);
-        }
-    }
-
-    private unsafe void ProcessMesh(Mesh* mesh, Scene* scene, List<VertexData> vertices, List<uint> indices, Dictionary<string, Vector3> parsedMaterials)
-    {
-        var startIndex = (uint)vertices.Count;
-
-        Vector3 diffuseColor = new Vector3(0.8f, 0.8f, 0.8f);
-        if (mesh->MMaterialIndex >= 0)
-        {
-            var material = scene->MMaterials[mesh->MMaterialIndex];
-            AssimpString name = new AssimpString();
-            _assimp?.GetMaterialString(material, Silk.NET.Assimp.Assimp.MatkeyName, 0, 0, ref name);
-
-            string matName = name.AsString;
-            if (parsedMaterials.TryGetValue(matName, out Vector3 parsedColor))
-            {
-                diffuseColor = parsedColor;
-            }
-            else
-            {
-                Vector4 color = new Vector4(1, 1, 1, 1);
-                if (_assimp?.GetMaterialColor(material, Silk.NET.Assimp.Assimp.MatkeyColorDiffuse, 0, 0, ref color) == Return.Success)
-                {
-                    diffuseColor = new Vector3(color.X, color.Y, color.Z);
-                }
-            }
-        }
-
-        for (uint i = 0; i < mesh->MNumVertices; i++)
-        {
-            var vertex = new VertexData();
-            vertex.Position = new Vector3(mesh->MVertices[i].X, mesh->MVertices[i].Y, mesh->MVertices[i].Z);
-
-            if (mesh->MNormals != null)
-            {
-                vertex.Normal = new Vector3(mesh->MNormals[i].X, mesh->MNormals[i].Y, mesh->MNormals[i].Z);
-            }
-
-            if (mesh->MTextureCoords[0] != null)
-            {
-                vertex.TexCoords = new Vector2(mesh->MTextureCoords[0][i].X, mesh->MTextureCoords[0][i].Y);
-            }
-            else
-            {
-                vertex.TexCoords = Vector2.Zero;
-            }
-
-            vertex.Color = diffuseColor;
-
-            vertices.Add(vertex);
-        }
-
-        for (uint i = 0; i < mesh->MNumFaces; i++)
-        {
-            var face = mesh->MFaces[i];
-            for (uint j = 0; j < face.MNumIndices; j++)
-            {
-                indices.Add((uint)(startIndex + face.MIndices[j]));
-            }
-        }
     }
 
     private float _time = 0.0f;

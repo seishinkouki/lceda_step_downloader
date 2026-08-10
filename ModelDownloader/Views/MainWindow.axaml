@@ -58,6 +58,7 @@
                        Source="/Assets/logo256.ico" />
                 <ComboBox MinHeight="26"
                           Margin="6,0,0,0"
+                          IsEnabled="{Binding !SearchCommand.IsRunning}"
                           ItemsSource="{Binding SearchSource}"
                           SelectedItem="{Binding SelectedSearchSource}" />
 
