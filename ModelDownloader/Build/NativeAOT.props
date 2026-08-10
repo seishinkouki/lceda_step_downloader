@@ -1,0 +1,23 @@
+<Project>
+    <PropertyGroup>
+        <TrimMode>full</TrimMode>
+        <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+        <StaticExecutable>true</StaticExecutable>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+        <DirectPInvoke Include="libSkiaSharp"/>
+        <DirectPInvoke Include="libHarfBuzzSharp"/>
+        <LinkerArg Include="d3d9.lib;dxguid.lib"/>
+        <LinkerArg Include="dxgi.lib"/>
+        <LinkerArg Include="Gdi32.lib;User32.lib"/>
+        <LinkerArg Include="synchronization.lib"/>
+        <LinkerArg Include="fontsub.lib;Ole32.lib;USP10.lib"/>
+        <LinkerArg Include="d3d12.lib;d3dcompiler.lib"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="2ndLAB.SkiaSharp.Static" Version="2.88.9-10.0.26100.0-1.1c7d845"/>
+        <PackageReference Include="VC-LTL" Version="5.3.1"/>
+    </ItemGroup>
+</Project>

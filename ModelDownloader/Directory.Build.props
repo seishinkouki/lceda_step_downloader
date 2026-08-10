@@ -1,0 +1,3 @@
+<Project>
+    <Import Project="Build\NativeAOT.props" Condition="'$(PublishAot)' == 'true'"/>
+</Project>

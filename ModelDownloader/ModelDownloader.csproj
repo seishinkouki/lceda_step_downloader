@@ -7,8 +7,6 @@
     <ApplicationIcon>Assets\logo256.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishAot>false</PublishAot>
-    <BuiltInComInteropSupport Condition="'$(PublishAot)' == 'true'">true</BuiltInComInteropSupport>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
