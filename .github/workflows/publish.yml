@@ -29,7 +29,11 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Publish
-        run: dotnet publish ModelDownloader.slnx -c Release -r win-x64 --self-contained true /p:PublishAot=${{ matrix.aot }} /p:PublishTrimmed=true /p:TrimMode=full /p:DebugType=none /p:DebugSymbols=false
+        run: dotnet publish ModelDownloader.slnx -c Release -r win-x64 --self-contained true /p:PublishAot=${{ matrix.aot }} /p:PublishSingleFile=${{ matrix.aot && 'false' || 'true' }} /p:PublishTrimmed=true /p:TrimMode=full /p:DebugType=none /p:DebugSymbols=false
+
+      - name: Clean PDB
+        shell: powershell
+        run: Remove-Item -Path "ModelDownloader\bin\Release\net10.0\win-x64\publish\*.pdb" -Force -ErrorAction SilentlyContinue
 
       - name: Set artifact name
         id: vars
@@ -53,6 +57,7 @@ jobs:
         with:
           name: ${{ steps.vars.outputs.name }}
           path: ${{ steps.vars.outputs.name }}.zip
+          archive: false
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -62,11 +67,16 @@ jobs:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
+        with:
+          name: ModelDownloader-win-x64
+      - uses: actions/download-artifact@v8
+        with:
+          name: ModelDownloader-win-x64-aot
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            ModelDownloader-win-x64/ModelDownloader-win-x64.zip
-            ModelDownloader-win-x64-aot/ModelDownloader-win-x64-aot.zip
+            ModelDownloader-win-x64.zip
+            ModelDownloader-win-x64-aot.zip
           generate_release_notes: true
