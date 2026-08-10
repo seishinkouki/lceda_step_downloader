@@ -8,6 +8,7 @@
     <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
         <DirectPInvoke Include="libSkiaSharp"/>
         <DirectPInvoke Include="libHarfBuzzSharp"/>
+        <DirectPInvoke Include="av_libglesv2"/>
         <LinkerArg Include="d3d9.lib;dxguid.lib"/>
         <LinkerArg Include="dxgi.lib"/>
         <LinkerArg Include="Gdi32.lib;User32.lib"/>
@@ -18,6 +19,7 @@
 
     <ItemGroup>
         <PackageReference Include="2ndLAB.SkiaSharp.Static" Version="3.119.0-10.0.26100.0-1.1c7d845"/>
+        <PackageReference Include="2ndLAB.ANGLE.Static" Version="7151.0.0-10.0.26100.0-1.79e529b"/>
         <PackageReference Include="VC-LTL" Version="5.3.1"/>
     </ItemGroup>
 </Project>
