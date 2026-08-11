@@ -77,21 +77,18 @@ jobs:
       - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
-          name: ModelDownloader-win-x64
+          name: ModelDownloader-win-x64.zip
       - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
-          name: ModelDownloader-win-x64-aot
-
-      - name: List downloaded files
-        run: ls -la
+          name: ModelDownloader-win-x64-aot.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: |
-            ModelDownloader-win-x64/ModelDownloader-win-x64.zip
-            ModelDownloader-win-x64-aot/ModelDownloader-win-x64-aot.zip
+            ModelDownloader-win-x64.zip/ModelDownloader-win-x64.zip
+            ModelDownloader-win-x64-aot.zip/ModelDownloader-win-x64-aot.zip
           fail_on_unmatched_files: false
           generate_release_notes: true
