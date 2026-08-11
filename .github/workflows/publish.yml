@@ -37,6 +37,11 @@ jobs:
           $pub = "ModelDownloader\bin\Release\net10.0\win-x64\publish\"
           Remove-Item -Path "$pub*.pdb" -Force -ErrorAction SilentlyContinue
           Remove-Item -Path "$pub*.lib" -Force -ErrorAction SilentlyContinue
+          if ('${{ matrix.aot }}' -eq 'true') {
+            Remove-Item -Path "$pub\libSkiaSharp.dll" -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$pub\libHarfBuzzSharp.dll" -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$pub\av_libglesv2.dll" -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Set artifact name
         id: vars
@@ -79,6 +84,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
+          draft: true
           files: |
             ModelDownloader-win-x64.zip
             ModelDownloader-win-x64-aot.zip
