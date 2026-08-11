@@ -76,16 +76,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: ModelDownloader-win-x64
-      - uses: actions/download-artifact@v8
-        with:
-          name: ModelDownloader-win-x64-aot
+          pattern: ModelDownloader-win-x64*
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: |
-            ModelDownloader-win-x64.zip
-            ModelDownloader-win-x64-aot.zip
+            *.zip
           generate_release_notes: true
