@@ -87,7 +87,6 @@ jobs:
         with:
           draft: true
           files: |
-            ModelDownloader-win-x64/ModelDownloader-win-x64.zip
-            ModelDownloader-win-x64-aot/ModelDownloader-win-x64-aot.zip
+            *.zip
           fail_on_unmatched_files: false
           generate_release_notes: true
