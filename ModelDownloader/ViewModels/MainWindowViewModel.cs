@@ -176,7 +176,16 @@ namespace ModelDownloader.ViewModels
 
                 var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID, CustomJsonSerializerContext.Default.Model3DComponent);
                 var url = "https://modules.lceda.cn/3dmodel/" + SelectedComponent?.Result?.Model3DUuid + "?path=" + SelectedComponent?.Result?.Path;
-                var streamObj = await Client.GetStreamAsync(url);
+                Stream? streamObj;
+                if (SelectedComponent?.Code != 404)
+                {
+                    streamObj = await Client.GetStreamAsync(url);
+                }
+                else
+                {
+                    streamObj = await Client.GetStreamAsync($"https://modules.lceda.cn/3dmodel/{model3DUUID}");
+                }
+                
                 var (objBytes, mtlBytes) = await ObjMtlSplitToBytes(streamObj);
 
                 if (objBytes != null && mtlBytes != null)
@@ -303,8 +312,19 @@ namespace ModelDownloader.ViewModels
         {
             if (item == null || item.Attributes == null || !item.Attributes.TryGetValue("3D Model", out var model3DUUID)) return;
             var SelectedComponent = await Client.GetFromJsonAsync<Models.Model3DComponent>("https://pro.lceda.cn/api/v2/components/" + model3DUUID, CustomJsonSerializerContext.Default.Model3DComponent);
-            if (SelectedComponent == null || SelectedComponent.Result == null) return;
-            var streamStep = await Client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.Result.Model3DUuid);
+            Stream? streamStep;
+            if (SelectedComponent == null || SelectedComponent.Result == null) 
+            {
+                streamStep = await Client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + model3DUUID);
+                if(streamStep == null)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                streamStep = await Client.GetStreamAsync("https://modules.lceda.cn/qAxj6KHrDKw4blvCG8QJPs7Y/" + SelectedComponent.Result.Model3DUuid);
+            }
 
             Directory.CreateDirectory(targetFolder);
             var tempTitle = GetSafeFileName(item?.Footprint?.DisplayTitle);
