@@ -14,7 +14,8 @@ namespace ModelDownloader
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
-            => AppBuilder.Configure<App>()
+        {
+            var builder = AppBuilder.Configure<App>()
                 .UsePlatformDetect()
                 .With(new AvaloniaNativePlatformOptions
                 {
@@ -29,5 +30,17 @@ namespace ModelDownloader
 #endif
                 .WithInterFont()
                 .LogToTrace();
+
+            if (OperatingSystem.IsLinux())
+            {
+                // The model viewer needs GL interop even when Mesa uses a CPU renderer.
+                builder = builder.With(new X11PlatformOptions
+                {
+                    GlxRendererBlacklist = ["SVGA3D"]
+                });
+            }
+
+            return builder;
+        }
     }
 }
