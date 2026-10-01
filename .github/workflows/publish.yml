@@ -45,7 +45,7 @@ jobs:
 
       - name: Set artifact name
         id: vars
-        shell: powershell
+        shell: pwsh
         run: |
           if ('${{ matrix.aot }}' -eq 'true') {
             echo "name=ModelDownloader-win-x64-aot" >> $env:GITHUB_OUTPUT
@@ -65,28 +65,179 @@ jobs:
         with:
           name: ${{ steps.vars.outputs.name }}
           path: ${{ steps.vars.outputs.name }}.zip
+          if-no-files-found: error
+
+  publish-macos:
+    name: macOS ARM64 DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: dotnet publish ModelDownloader/ModelDownloader.csproj -c Release -r osx-arm64 --self-contained true -p:PublishAot=false -p:PublishSingleFile=true -p:PublishTrimmed=true -p:TrimMode=full -p:DebugType=none -p:DebugSymbols=false -o "$RUNNER_TEMP/publish"
+
+      - name: Pack DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/ModelDownloader.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp -R "$RUNNER_TEMP/publish/." "$app/Contents/MacOS/"
+          rm -f "$app/Contents/MacOS/"*.pdb
+          chmod +x "$app/Contents/MacOS/ModelDownloader"
+
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$GITHUB_REF" == refs/tags/v* || ! "$version" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+            version="1.0.0"
+          fi
+          cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>com.seishinkouki.modeldownloader</string>
+            <key>CFBundleName</key><string>ModelDownloader</string>
+            <key>CFBundleDisplayName</key><string>ModelDownloader</string>
+            <key>CFBundleExecutable</key><string>ModelDownloader</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>ModelDownloader.icns</string>
+            <key>CFBundleShortVersionString</key><string>$version</string>
+            <key>CFBundleVersion</key><string>$GITHUB_RUN_NUMBER</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+
+          iconset="$RUNNER_TEMP/ModelDownloader.iconset"
+          mkdir -p "$iconset"
+          for size in 16 32 64 128 256; do
+            sips -z "$size" "$size" ModelDownloader/Assets/logo256.png --out "$iconset/icon_${size}.png" >/dev/null
+          done
+          cp "$iconset/icon_16.png" "$iconset/icon_16x16.png"
+          cp "$iconset/icon_32.png" "$iconset/icon_16x16@2x.png"
+          cp "$iconset/icon_32.png" "$iconset/icon_32x32.png"
+          cp "$iconset/icon_64.png" "$iconset/icon_32x32@2x.png"
+          cp "$iconset/icon_128.png" "$iconset/icon_128x128.png"
+          cp "$iconset/icon_256.png" "$iconset/icon_128x128@2x.png"
+          cp "$iconset/icon_256.png" "$iconset/icon_256x256.png"
+          rm "$iconset"/icon_{16,32,64,128,256}.png
+          iconutil -c icns "$iconset" -o "$app/Contents/Resources/ModelDownloader.icns"
+
+          cat > "$RUNNER_TEMP/entitlements.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>com.apple.security.cs.allow-jit</key><true/>
+          </dict></plist>
+          PLIST
+          while IFS= read -r -d '' library; do
+            codesign --force --sign - "$library"
+          done < <(find "$app/Contents/MacOS" -type f \( -name '*.dylib' -o -name '*.so' \) -print0)
+          codesign --force --sign - --entitlements "$RUNNER_TEMP/entitlements.plist" "$app"
+          codesign --verify --deep --strict "$app"
+
+          dmg_root="$RUNNER_TEMP/dmg"
+          mkdir -p "$dmg_root"
+          cp -R "$app" "$dmg_root/"
+          ln -s /Applications "$dmg_root/Applications"
+          hdiutil create -volname ModelDownloader -srcfolder "$dmg_root" -ov -format UDZO ModelDownloader-osx-arm64.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ModelDownloader-osx-arm64
+          path: ModelDownloader-osx-arm64.dmg
+          if-no-files-found: error
+
+  publish-linux:
+    name: Linux ${{ matrix.rid }} AppImage
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            rid: linux-x64
+            appimage_arch: x86_64
+          - runner: ubuntu-22.04-arm
+            rid: linux-arm64
+            appimage_arch: aarch64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: dotnet publish ModelDownloader/ModelDownloader.csproj -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishAot=false -p:PublishSingleFile=true -p:PublishTrimmed=true -p:TrimMode=full -p:DebugType=none -p:DebugSymbols=false -o "$RUNNER_TEMP/publish"
+
+      - name: Pack AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          appdir="$RUNNER_TEMP/ModelDownloader.AppDir"
+          mkdir -p "$appdir/usr/bin"
+          cp -R "$RUNNER_TEMP/publish/." "$appdir/usr/bin/"
+          rm -f "$appdir/usr/bin/"*.pdb
+          chmod +x "$appdir/usr/bin/ModelDownloader"
+          cp ModelDownloader/Assets/logo256.png "$appdir/modeldownloader.png"
+          cat > "$appdir/ModelDownloader.desktop" <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=ModelDownloader
+          Exec=ModelDownloader
+          Icon=modeldownloader
+          Categories=Utility;
+          Terminal=false
+          DESKTOP
+          cat > "$appdir/AppRun" <<'APP_RUN'
+          #!/bin/sh
+          HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          export LD_LIBRARY_PATH="$HERE/usr/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$HERE/usr/bin/ModelDownloader" "$@"
+          APP_RUN
+          chmod +x "$appdir/AppRun"
+
+          curl --fail --location --retry 3 \
+            "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-${{ matrix.appimage_arch }}.AppImage" \
+            --output "$RUNNER_TEMP/appimagetool.AppImage"
+          chmod +x "$RUNNER_TEMP/appimagetool.AppImage"
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=${{ matrix.appimage_arch }} \
+            "$RUNNER_TEMP/appimagetool.AppImage" "$appdir" "ModelDownloader-${{ matrix.rid }}.AppImage"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ModelDownloader-${{ matrix.rid }}
+          path: ModelDownloader-${{ matrix.rid }}.AppImage
+          if-no-files-found: error
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: publish-windows
+    needs: [publish-windows, publish-macos, publish-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
-          name: ModelDownloader-win-x64
-      - uses: actions/download-artifact@v8
-        continue-on-error: true
-        with:
-          name: ModelDownloader-win-x64-aot
+          pattern: ModelDownloader-*
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: |
-            *.zip
-          fail_on_unmatched_files: false
+            ModelDownloader-win-x64.zip
+            ModelDownloader-win-x64-aot.zip
+            ModelDownloader-osx-arm64.dmg
+            ModelDownloader-linux-x64.AppImage
+            ModelDownloader-linux-arm64.AppImage
+          fail_on_unmatched_files: true
           generate_release_notes: true
