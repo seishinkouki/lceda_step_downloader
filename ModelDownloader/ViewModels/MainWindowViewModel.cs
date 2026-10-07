@@ -25,6 +25,13 @@ namespace ModelDownloader.ViewModels
         [ObservableProperty] public partial ResultItemViewModel? SelectedSearchResult { get; set; } = null;
         [ObservableProperty] public partial Bitmap? CurrentImageSource { get; set; } = null;
 
+        /// <summary>下载文件的保存目录（可在 设置->保存位置 菜单中修改）</summary>
+        [ObservableProperty]
+        public partial string SaveLocation { get; set; } =
+            AppSettings.Load().SaveLocation is { Length: > 0 } saved
+                ? saved
+                : Path.Combine(AppContext.BaseDirectory, "step");
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsBusy))]
         public partial bool IsImageLoading { get; set; } = false;
@@ -263,7 +270,7 @@ namespace ModelDownloader.ViewModels
 
             try
             {
-                await DownloadStepAsync(item.Model, Path.Combine(AppContext.BaseDirectory, "step"));
+                await DownloadStepAsync(item.Model, SaveLocation);
                 task.Progress = 100;
                 task.StatusText = "完成";
             }
@@ -292,6 +299,14 @@ namespace ModelDownloader.ViewModels
         {
             item.IsChecked = false;
             StagedDownloads.Remove(item);
+        }
+
+        /// <summary>更新下载保存位置并持久化（由 设置->保存位置 菜单触发）</summary>
+        public void SetSaveLocation(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            SaveLocation = path;
+            new AppSettings { SaveLocation = path }.Save();
         }
 
         [RelayCommand]

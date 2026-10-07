@@ -265,6 +265,7 @@ public class DataStrContent
 [JsonSerializable(typeof(FootprintInfo))]
 [JsonSerializable(typeof(Model3DComponent))]
 [JsonSerializable(typeof(Model3DDetail))]
+[JsonSerializable(typeof(AppSettings))]
 public partial class CustomJsonSerializerContext : JsonSerializerContext
 {
 }
