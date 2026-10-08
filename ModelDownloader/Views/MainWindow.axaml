@@ -6,9 +6,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ModelDownloader.ViewModels"
         Title=""
-        Width="700"
+        Width="720"
         Height="600"
-        MinWidth="700"
+        MinWidth="720"
         MinHeight="600"
         d:DesignHeight="450"
         d:DesignWidth="600"
@@ -75,6 +75,15 @@
                                 CommandParameter="{Binding #SearchBox.Text}"
                                 Gesture="Enter" />
                 </TextBox.KeyBindings>
+                <!-- 自定义右键菜单：默认菜单的"粘贴"走框架剪贴板，Linux 下部分环境读取
+                     失败且无反应，这里统一走 ClipboardHelper 兜底链 -->
+                <TextBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="粘贴" Click="PasteMenuItem_OnClick" InputGesture="Ctrl+V" />
+                        <MenuItem Header="复制" Click="CopyMenuItem_OnClick" InputGesture="Ctrl+C" />
+                        <MenuItem Header="全选" Click="SelectAllMenuItem_OnClick" InputGesture="Ctrl+A" />
+                    </ContextMenu>
+                </TextBox.ContextMenu>
                 <TextBox.InnerRightContent>
                     <Button x:Name="SearchButton"
                             Width="24"
@@ -190,6 +199,18 @@
                               Height="18"
                               Data="{StaticResource SemiIconDownload}" />
                 </Button>
+                <Button Width="32"
+                        Height="32"
+                        Padding="0"
+                        Background="{DynamicResource ButtonBorderlessBackground}"
+                        BorderThickness="0"
+                        Classes="Tertiary"
+                        Command="{Binding OpenSettingsCommand}"
+                        ToolTip.Tip="设置">
+                    <PathIcon Width="16"
+                              Height="16"
+                              Data="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+                </Button>
                 <ToggleButton Width="32"
                               Height="32"
                               Padding="0"
@@ -236,30 +257,43 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid Height="24" Margin="0">
+                            <!-- 右键整行可复制立创元件编号 -->
+                            <Grid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Click="CopyPartNumberMenuItem_OnClick" Header="复制元件编号" />
+                                </ContextMenu>
+                            </Grid.ContextMenu>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" SharedSizeGroup="TitleColumn" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="PartNumberColumn" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-
+    
                             <CheckBox Grid.Column="0"
                                       Margin="0,0,10,0"
                                       VerticalAlignment="Center"
                                       Command="{Binding $parent[Window].DataContext.ToggleStageCommand}"
                                       CommandParameter="{Binding}"
                                       IsChecked="{Binding IsChecked}" />
-
+    
                             <TextBlock Grid.Column="1"
                                        Margin="0,0,20,0"
                                        VerticalAlignment="Center"
                                        Text="{Binding Model.DisplayTitle}" />
-
+    
                             <TextBlock Grid.Column="2"
+                                       Margin="0,0,20,0"
+                                       VerticalAlignment="Center"
+                                       Opacity="0.7"
+                                       Text="{Binding PartNumber}" />
+    
+                            <TextBlock Grid.Column="3"
                                        VerticalAlignment="Center"
                                        Text="{Binding Model.Attributes[Manufacturer]}" />
-
-                            <Button Grid.Column="3"
+    
+                            <Button Grid.Column="4"
                                     Padding="4"
                                     Background="{DynamicResource ButtonBorderlessBackground}"
                                     BorderThickness="0"
@@ -289,6 +323,13 @@
                 <controls:ModelViewer x:Name="Viewer"
                                       Grid.Row="1"
                                       Source="{Binding SelectedModelSource}" />
+                <!-- 元件暂未绘制 3D 模型时的占位提示 -->
+                <TextBlock Grid.Row="1"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding IsModelMissing}"
+                           Opacity="0.55"
+                           Text="该元件暂未绘制 3D 模型" />
                 <controls:ViewCubeControl Grid.Row="1"
                                           Width="50"
                                           Height="50"
