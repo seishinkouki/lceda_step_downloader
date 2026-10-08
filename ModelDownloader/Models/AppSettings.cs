@@ -10,8 +10,17 @@ namespace ModelDownloader.Models;
 /// </summary>
 public class AppSettings
 {
-    /// <summary>下载文件的保存目录</summary>
+    /// <summary>3D 模型（STEP）文件的保存目录</summary>
     public string? SaveLocation { get; set; }
+
+    /// <summary>符号文件的保存目录</summary>
+    public string? SymbolLocation { get; set; }
+
+    /// <summary>封装文件的保存目录</summary>
+    public string? FootprintLocation { get; set; }
+
+    /// <summary>符号/封装导出格式:elibz2(立创) | kicad | pads</summary>
+    public string? LibraryFormat { get; set; }
 
     private static string SettingsDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

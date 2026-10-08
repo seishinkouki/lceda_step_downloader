@@ -188,6 +188,18 @@ public class Model3DDetail
     [JsonPropertyName("dataStr")]
     public string? DataStr { get; set; }
 
+    /// <summary>库文档(符号/封装)存储地址(AES-256-GCM 密文 + gzip)</summary>
+    [JsonPropertyName("dataStrId")]
+    public string? DataStrId { get; set; }
+
+    /// <summary>解密用初始化向量(12 字节 hex,由详情接口动态下发)</summary>
+    [JsonPropertyName("iv")]
+    public string? Iv { get; set; }
+
+    /// <summary>解密用密钥(32 字节 hex,由详情接口动态下发)</summary>
+    [JsonPropertyName("key")]
+    public string? Key { get; set; }
+
     [JsonPropertyName("tags")]
     public Model3DTags? Tags { get; set; }
 
@@ -234,14 +246,16 @@ public class Model3DDetail
     public string? Path { get; set; }
 }
 
-// 3D模型的标签（parent_tag和child_tag都是数组）
+// 库文档的标签。
+// 注意:不同文档类型的结构不一致——3D 模型详情里两者都是数组,
+// 而符号/封装详情里是对象,因此用 object 接收以兼容任意 JSON 值。
 public class Model3DTags
 {
     [JsonPropertyName("parent_tag")]
-    public List<object>? ParentTag { get; set; } // 空数组
+    public object? ParentTag { get; set; }
 
     [JsonPropertyName("child_tag")]
-    public List<object>? ChildTag { get; set; } // 空数组
+    public object? ChildTag { get; set; }
 }
 
 // DataStr的解析类（可选，如果需要解析dataStr字段）

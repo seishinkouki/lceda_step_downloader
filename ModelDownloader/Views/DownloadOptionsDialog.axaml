@@ -1,0 +1,38 @@
+<Window x:Class="ModelDownloader.Views.DownloadOptionsDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择下载内容"
+        Width="340"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+    <StackPanel Margin="16" Spacing="6">
+        <TextBlock Margin="0,0,0,8"
+                   Text="请选择需要下载的内容（可多选）" />
+
+        <CheckBox x:Name="CbSymbol"
+                  Content="符号 (Symbol)"
+                  IsChecked="True" />
+
+        <CheckBox x:Name="CbFootprint"
+                  Content="封装 (Footprint)"
+                  IsChecked="True" />
+
+        <CheckBox x:Name="CbModel"
+                  Content="3D 模型 (STEP)"
+                  IsChecked="True" />
+
+        <StackPanel Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="8">
+            <Button x:Name="OkButton"
+                    Classes="Primary"
+                    Click="OkButton_OnClick"
+                    Content="确定" />
+            <Button Click="CancelButton_OnClick"
+                    Content="取消" />
+        </StackPanel>
+    </StackPanel>
+</Window>

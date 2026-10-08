@@ -1,0 +1,62 @@
+<Window x:Class="ModelDownloader.Views.SettingsDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+    <StackPanel Margin="16" Spacing="6">
+        <TextBlock FontWeight="Bold"
+                   Text="符号/封装导出格式" />
+        <ComboBox x:Name="FormatBox" MinHeight="32">
+            <ComboBoxItem Content="elibz2（立创EDA 专业版）" Tag="elibz2" />
+            <ComboBoxItem Content="KiCad（.kicad_sym / .kicad_mod）" Tag="kicad" />
+            <ComboBoxItem Content="PADS ASCII（.asc，AD 导入向导可用）" Tag="pads" />
+        </ComboBox>
+
+        <TextBlock Margin="0,10,0,0"
+                   FontWeight="Bold"
+                   Text="保存位置" />
+
+        <TextBlock Margin="0,6,0,0" Text="符号 (Symbol)" />
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBox x:Name="SymbolPathBox" PlaceholderText="选择符号文件保存目录" />
+            <Button Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Click="BrowseSymbol_OnClick"
+                    Content="浏览..." />
+        </Grid>
+
+        <TextBlock Margin="0,6,0,0" Text="封装 (Footprint)" />
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBox x:Name="FootprintPathBox" PlaceholderText="选择封装文件保存目录" />
+            <Button Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Click="BrowseFootprint_OnClick"
+                    Content="浏览..." />
+        </Grid>
+
+        <TextBlock Margin="0,6,0,0" Text="3D 模型 (STEP)" />
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBox x:Name="Model3DPathBox" PlaceholderText="选择 STEP 文件保存目录" />
+            <Button Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Click="BrowseModel3D_OnClick"
+                    Content="浏览..." />
+        </Grid>
+
+        <StackPanel Margin="0,18,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="8">
+            <Button x:Name="SaveButton"
+                    Classes="Primary"
+                    Click="Save_OnClick"
+                    Content="保存" />
+            <Button Click="Cancel_OnClick"
+                    Content="取消" />
+        </StackPanel>
+    </StackPanel>
+</Window>
